@@ -58,7 +58,7 @@ func NewSensor(ctx context.Context, deps resource.Dependencies, conf resource.Co
 func (c *Config) Reconfigure(ctx context.Context, _ resource.Dependencies, conf resource.Config) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.logger.Debug("Reconfiguring Docker Manager Module")
+	c.logger.Debugf("Reconfiguring %s", PrettyName)
 
 	newConf, err := resource.NativeConfig[*ComponentConfig](conf)
 	if err != nil {

@@ -40,10 +40,10 @@ jobs:
         go-version: '1.21'
 
     - name: Build
-      run: go build -o viam-docker-manager -v .
+      run: go build -o viam-raspi-sensors -v .
 
     - name: Package
-      run: tar -zcf viam-docker-manager-${{ env.os }}-${{ env.GOARCH }}.tar.gz viam-docker-manager
+      run: tar -zcf viam-raspi-sensors-${{ env.os }}-${{ env.GOARCH }}.tar.gz viam-raspi-sensors
     
     - uses: actions/upload-artifact@v3
       with:

@@ -1,4 +1,4 @@
-module github.com/viam-soleng/viam-raspi-utils
+module github.com/viam-soleng/viam-raspi-sensors
 
 go 1.21
 

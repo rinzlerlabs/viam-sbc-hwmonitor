@@ -1,4 +1,4 @@
-package power
+package voltages
 
 import (
 	"errors"

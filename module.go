@@ -8,11 +8,11 @@ import (
 	"go.viam.com/rdk/module"
 	"go.viam.com/utils"
 
-	"github.com/viam-soleng/viam-raspi-utils/clocks"
-	"github.com/viam-soleng/viam-raspi-utils/cpu_manager"
-	"github.com/viam-soleng/viam-raspi-utils/power"
-	"github.com/viam-soleng/viam-raspi-utils/temperature"
-	"github.com/viam-soleng/viam-raspi-utils/throttling"
+	"github.com/viam-soleng/viam-raspi-sensors/clocks"
+	"github.com/viam-soleng/viam-raspi-sensors/cpu_manager"
+	"github.com/viam-soleng/viam-raspi-sensors/temperatures"
+	"github.com/viam-soleng/viam-raspi-sensors/throttling"
+	"github.com/viam-soleng/viam-raspi-sensors/voltages"
 )
 
 func main() {
@@ -35,7 +35,7 @@ func mainWithArgs(ctx context.Context, args []string, logger logging.Logger) (er
 		return err
 	}
 
-	err = custom_module.AddModelFromRegistry(ctx, sensor.API, temperature.Model)
+	err = custom_module.AddModelFromRegistry(ctx, sensor.API, temperatures.Model)
 	if err != nil {
 		return err
 	}
@@ -45,7 +45,7 @@ func mainWithArgs(ctx context.Context, args []string, logger logging.Logger) (er
 		return err
 	}
 
-	err = custom_module.AddModelFromRegistry(ctx, sensor.API, power.Model)
+	err = custom_module.AddModelFromRegistry(ctx, sensor.API, voltages.Model)
 	if err != nil {
 		return err
 	}

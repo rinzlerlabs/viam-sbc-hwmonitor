@@ -1,4 +1,4 @@
-package power
+package voltages
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 	"go.viam.com/rdk/resource"
 )
 
-var Model = resource.NewModel("viam-soleng", "raspi", "power")
+var Model = resource.NewModel("viam-soleng", "raspi", "voltages")
 var PrettyName = "Raspberry Pi Power Sensor"
 var Description = "A sensor that reports the voltages of the Raspberry Pi."
 var Version = "v0.0.1"

@@ -1,4 +1,4 @@
-package temperature
+package temperatures
 
 import (
 	"context"

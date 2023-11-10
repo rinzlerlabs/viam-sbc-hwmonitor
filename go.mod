@@ -3,6 +3,7 @@ module github.com/viam-soleng/viam-raspi-sensors
 go 1.21
 
 require (
+	github.com/stretchr/testify v1.8.4
 	go.viam.com/rdk v0.12.0
 	go.viam.com/utils v0.1.54
 )
@@ -95,7 +96,6 @@ require (
 	github.com/sergi/go-diff v1.3.1 // indirect
 	github.com/smartystreets/assertions v1.13.0 // indirect
 	github.com/srikrsna/protoc-gen-gotag v0.6.2 // indirect
-	github.com/stretchr/testify v1.8.4 // indirect
 	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
 	github.com/xdg-go/scram v1.1.2 // indirect
 	github.com/xdg-go/stringprep v1.0.4 // indirect

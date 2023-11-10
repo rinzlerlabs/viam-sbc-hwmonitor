@@ -1,4 +1,4 @@
-package temperatures
+package utils
 
 import (
 	"testing"

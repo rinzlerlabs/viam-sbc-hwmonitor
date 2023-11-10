@@ -16,7 +16,7 @@ import (
 var Model = resource.NewModel("viam-soleng", "raspi", "cpu_manager")
 var PrettyName = "Raspberry Pi CPU Manager"
 var Description = "A sensor that reports and manages the CPU configuration of the Raspberry Pi."
-var Version = "v0.0.1"
+var Version = utils.Version
 
 type Config struct {
 	resource.Named

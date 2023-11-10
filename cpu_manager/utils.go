@@ -15,7 +15,7 @@ func getAvailableGovernors() ([]string, error) {
 	return strings.Split(string(outputBytes), " "), nil
 }
 
-func getFrequencyLimits() (minimum int, maximum int, err error) {
+func getFrequencyLimits() (Minimum int, Maximum int, Err error) {
 	proc := exec.Command("cpufreq-info", "-l")
 	outputBytes, err := proc.Output()
 	if err != nil {
@@ -48,10 +48,10 @@ func getCurrentPolicy() (MinimumFrequency int, MaximumFrequency int, Governor st
 	if err != nil {
 		return 0, 0, "", err
 	}
-	return min, max, policy[2], nil
+	return min, max, strings.TrimSpace(policy[2]), nil
 }
 
-func getCurrentFrequency() (int, error) {
+func getCurrentFrequency() (Frequency int, Err error) {
 	proc := exec.Command("cpufreq-info", "-f")
 	outputBytes, err := proc.Output()
 	if err != nil {

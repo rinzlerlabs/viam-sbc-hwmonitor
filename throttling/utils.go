@@ -1,7 +1,7 @@
 package throttling
 
 import (
-	"errors"
+	"fmt"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -16,9 +16,9 @@ func getThrottlingStates() (Undervolt, ArmFrequencyCapped, CurrentlyThrottled, S
 	output := string(outputBytes)
 	parts := strings.Split(output, "=")
 	if len(parts) != 2 {
-		return false, false, false, false, false, false, false, false, errors.New("unexpected output from vcgencmd")
+		return false, false, false, false, false, false, false, false, fmt.Errorf("unexpected output from vcgencmd %s", output)
 	}
-	hex := strings.Replace(parts[1], "0x", "", 1)
+	hex := strings.TrimSpace(strings.Replace(parts[1], "0x", "", 1))
 	throttlingStates, err := strconv.ParseInt(hex, 16, 64)
 	if err != nil {
 		return false, false, false, false, false, false, false, false, err

@@ -6,20 +6,26 @@ import (
 	"strings"
 )
 
-func getPmicTemperature() (float64, error) {
+func getPmicTemperature() (Temperature float64, Err error) {
 	proc := exec.Command("vcgencmd", "measure_temp", "pmic")
 	outputBytes, err := proc.Output()
 	if err != nil {
 		return 0, err
 	}
-	return strconv.ParseFloat(strings.TrimSuffix(strings.Split(string(outputBytes), "=")[1], "'C\n"), 64)
+	return parseTemperature(string(outputBytes))
 }
 
-func getSoCTemperature() (float64, error) {
+func getSoCTemperature() (Temperature float64, Err error) {
 	proc := exec.Command("vcgencmd", "measure_temp")
 	outputBytes, err := proc.Output()
 	if err != nil {
 		return 0, err
 	}
-	return strconv.ParseFloat(strings.TrimSuffix(strings.Split(string(outputBytes), "=")[1], "'C\n"), 64)
+	return parseTemperature(string(outputBytes))
+}
+
+func parseTemperature(output string) (Temperature float64, Err error) {
+	t := strings.Split(output, "=")
+	t1 := strings.TrimSuffix(t[1], "'C\n")
+	return strconv.ParseFloat(strings.TrimSpace(t1), 64)
 }

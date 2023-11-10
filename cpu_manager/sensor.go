@@ -67,7 +67,7 @@ func (c *Config) Reconfigure(ctx context.Context, _ resource.Dependencies, conf 
 
 	err = utils.InstallPackage("cpufrequtils")
 	if err != nil {
-		c.logger.Error("Error installing cpufrequtils: %s", err)
+		c.logger.Errorf("Error installing cpufrequtils: %s", err)
 		return err
 	}
 
@@ -92,13 +92,17 @@ func (c *Config) Reconfigure(ctx context.Context, _ resource.Dependencies, conf 
 		args = append(args, "--max", strconv.Itoa(c.Maximum))
 	}
 
-	proc := exec.Command("cpufreq-set", args...)
+	if len(args) > 0 {
+		proc := exec.Command("cpufreq-set", args...)
 
-	outputBytes, err := proc.Output()
-	if err != nil {
-		c.logger.Error("Error configuring CPU: %s", err)
+		outputBytes, err := proc.Output()
+		if err != nil {
+			c.logger.Errorf("Error configuring CPU: %s", err)
+		}
+		c.logger.Infof("CPU configured: %s", string(outputBytes))
+	} else {
+		c.logger.Info("No configuration changes made")
 	}
-	c.logger.Info("CPU configured: %s", string(outputBytes))
 
 	return nil
 }

@@ -27,20 +27,20 @@ func getVoltages() (Core, SDRAM_c, SDRAM_i, SDRAM_p float64, Err error) {
 	return core, sdram_c, sdram_i, sdram_p, nil
 }
 
-func getComponentVoltage(component string) (float64, error) {
+func getComponentVoltage(component string) (Voltage float64, Err error) {
 	proc := exec.Command("vcgencmd", "measure_volts", component)
 	outputBytes, err := proc.Output()
 	if err != nil {
 		return 0, err
 	}
 	output := string(outputBytes)
+	return parseVoltage(output)
+}
+
+func parseVoltage(output string) (Voltage float64, Err error) {
 	parts := strings.Split(output, "=")
 	if len(parts) != 2 {
 		return 0, errors.New("unexpected output from vcgencmd")
 	}
-	voltage, err := strconv.ParseFloat(strings.Replace(parts[1], "V", "", 1), 64)
-	if err != nil {
-		return 0, err
-	}
-	return voltage, nil
+	return strconv.ParseFloat(strings.TrimSpace(strings.Replace(parts[1], "V", "", 1)), 64)
 }

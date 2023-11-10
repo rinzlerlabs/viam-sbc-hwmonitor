@@ -54,7 +54,7 @@ jobs:
     strategy:
       matrix:
         runner: [ ubuntu-latest ]
-        arch: [ arm64 ]
+        arch: [ amd64 ]
     runs-on: ubuntu-latest
     env:
       os: ${{contains(matrix.runner, 'ubuntu') && 'linux' || contains(matrix.runner, 'macos') && 'macos' || 'unknown'}}

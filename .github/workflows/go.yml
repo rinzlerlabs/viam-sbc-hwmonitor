@@ -50,26 +50,26 @@ jobs:
         name: viam-raspi-sensors-${{ env.os }}-${{ env.GOARCH }}
         path: viam-raspi-sensors-${{ env.os }}-${{ env.GOARCH }}.tar.gz
 
-  # test:
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #   - name: Check out code
-  #     if: github.event_name != 'pull_request_target'
-  #     uses: actions/checkout@v3
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check out code
+      if: github.event_name != 'pull_request_target'
+      uses: actions/checkout@v3
 
-  #   - name: Check out PR branch code
-  #     if: github.event_name == 'pull_request_target'
-  #     uses: actions/checkout@v3
-  #     with:
-  #       ref: ${{ github.event.pull_request.head.sha }}
-  #       fetch-depth: 0
+    - name: Check out PR branch code
+      if: github.event_name == 'pull_request_target'
+      uses: actions/checkout@v3
+      with:
+        ref: ${{ github.event.pull_request.head.sha }}
+        fetch-depth: 0
 
-  #   - name: Set up Go
-  #     uses: actions/setup-go@v4
-  #     with:
-  #       go-version: '1.21'
-  #   - name: Test
-  #     run: go test -v ./...
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+    - name: Test
+      run: go test -v ./...
 
   publish:
     strategy:

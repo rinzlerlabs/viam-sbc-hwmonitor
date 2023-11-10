@@ -24,6 +24,11 @@
       "api": "rdk:component:sensor",
       "model": "viam-soleng:raspi:throttling"
     }
+    ,
+    {
+      "api": "rdk:component:sensor",
+      "model": "viam-soleng:raspi:pwm_fan"
+    }
   ],
   "entrypoint": "viam-raspi-sensors"
 }

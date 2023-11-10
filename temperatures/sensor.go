@@ -11,7 +11,7 @@ import (
 	"github.com/viam-soleng/viam-raspi-sensors/utils"
 )
 
-var Model = resource.NewModel("viam-soleng", "raspi", "temperature")
+var Model = resource.NewModel("viam-soleng", "raspi", "temperatures")
 var PrettyName = "Raspberry Pi Temperature Sensor"
 var Description = "A sensor that reports the temperatures of the Raspberry Pi."
 var Version = utils.Version
@@ -63,11 +63,11 @@ func (c *Config) Reconfigure(ctx context.Context, _ resource.Dependencies, conf 
 func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	socTemp, err := getSoCTemperature()
+	socTemp, err := utils.GetSoCTemperature()
 	if err != nil {
 		return nil, err
 	}
-	pmicTemp, err := getPmicTemperature()
+	pmicTemp, err := utils.GetPmicTemperature()
 	if err != nil {
 		return nil, err
 	}

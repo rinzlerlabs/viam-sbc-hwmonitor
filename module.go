@@ -10,6 +10,7 @@ import (
 
 	"github.com/viam-soleng/viam-raspi-sensors/clocks"
 	"github.com/viam-soleng/viam-raspi-sensors/cpu_manager"
+	"github.com/viam-soleng/viam-raspi-sensors/pwm_fan"
 	"github.com/viam-soleng/viam-raspi-sensors/temperatures"
 	"github.com/viam-soleng/viam-raspi-sensors/throttling"
 	"github.com/viam-soleng/viam-raspi-sensors/voltages"
@@ -46,6 +47,11 @@ func mainWithArgs(ctx context.Context, args []string, logger logging.Logger) (er
 	}
 
 	err = custom_module.AddModelFromRegistry(ctx, sensor.API, voltages.Model)
+	if err != nil {
+		return err
+	}
+
+	err = custom_module.AddModelFromRegistry(ctx, sensor.API, pwm_fan.Model)
 	if err != nil {
 		return err
 	}

@@ -73,20 +73,14 @@ func (c *Config) Reconfigure(ctx context.Context, deps resource.Dependencies, co
 		return err
 	}
 
-	err = utils.InstallPackage("cpufrequtils")
-	if err != nil {
-		c.logger.Errorf("Error installing cpufrequtils: %s", err)
-		return err
-	}
-
 	untypedBoard, err := deps.Lookup(resource.NewName(board.API, newConf.BoardName))
 	if err != nil {
 		c.logger.Errorf("Error looking up board: %s", err)
 		return err
 	}
 
-	actualBoard := untypedBoard.(board.Board)
-	fanPin, err := actualBoard.GPIOPinByName(newConf.FanPin)
+	board := untypedBoard.(board.Board)
+	fanPin, err := board.GPIOPinByName(newConf.FanPin)
 	if err != nil {
 		c.logger.Errorf("Error looking up fan pin: %s", err)
 		return err
@@ -95,6 +89,7 @@ func (c *Config) Reconfigure(ctx context.Context, deps resource.Dependencies, co
 	// In case the module has changed name
 	c.Named = conf.ResourceName().AsNamed()
 	c.FanPin = fanPin
+	c.Board = &board
 
 	tempTable := make(map[float64]float64)
 	temps := make([]float64, 0, len(newConf.TemperatureTable))
@@ -182,8 +177,11 @@ func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (ma
 }
 
 func (c *Config) Close(ctx context.Context) error {
+	c.logger.Infof("Shutting down %s", PrettyName)
 	c.done <- true
+	c.logger.Infof("Notifying monitor to shut down")
 	c.wg.Wait()
+	c.logger.Info("Monitor shut down")
 	return nil
 }
 

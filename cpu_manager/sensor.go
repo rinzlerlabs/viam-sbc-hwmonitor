@@ -128,6 +128,7 @@ func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (ma
 }
 
 func (c *Config) Close(ctx context.Context) error {
+	c.logger.Infof("Shutting down %s", PrettyName)
 	return nil
 }
 

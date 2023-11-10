@@ -7,12 +7,14 @@ import (
 	"go.viam.com/rdk/components/sensor"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
+
+	"github.com/viam-soleng/viam-raspi-sensors/utils"
 )
 
 var Model = resource.NewModel("viam-soleng", "raspi", "throttling")
 var PrettyName = "Raspberry Pi Throttling Sensor"
 var Description = "A sensor that reports the throttling state of the Raspberry Pi."
-var Version = "v0.0.1"
+var Version = utils.Version
 
 type Config struct {
 	resource.Named

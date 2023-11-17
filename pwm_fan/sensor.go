@@ -144,7 +144,12 @@ func (c *Config) Reconfigure(ctx context.Context, deps resource.Dependencies, co
 					}
 				}
 
-				time.Sleep(100 * time.Millisecond)
+				select {
+				case <-time.After(100 * time.Millisecond):
+					continue
+				case <-c.done:
+					return
+				}
 			}
 		}
 

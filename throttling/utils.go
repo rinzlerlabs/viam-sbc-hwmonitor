@@ -7,21 +7,45 @@ import (
 	"strings"
 )
 
-func getThrottlingStates() (Undervolt, ArmFrequencyCapped, CurrentlyThrottled, SoftTempLimitActive, UnderVoltOccurred, ArmFrequencyCapOccurred, ThrottlingOccurred, SoftTempLimitOccurred bool, Err error) {
+const (
+	Undervolt               = "undervolt"
+	ArmFrequencyCapped      = "armFrequencyCapped"
+	CurrentlyThrottled      = "currentlyThrottled"
+	SoftTempLimitActive     = "softTempLimitActive"
+	UnderVoltOccurred       = "undervoltOccurred"
+	ArmFrequencyCapOccurred = "armFrequencyCapOccurred"
+	ThrottlingOccurred      = "throttlingOccurred"
+	SoftTempLimitOccurred   = "softTempLimitOccurred"
+)
+
+func getThrottlingStates() (map[string]bool, error) {
 	proc := exec.Command("vcgencmd", "get_throttled")
 	outputBytes, err := proc.Output()
 	if err != nil {
-		return false, false, false, false, false, false, false, false, err
+		return nil, err
 	}
 	output := string(outputBytes)
+	return parseThrottlingStates(output)
+}
+
+func parseThrottlingStates(output string) (map[string]bool, error) {
 	parts := strings.Split(output, "=")
 	if len(parts) != 2 {
-		return false, false, false, false, false, false, false, false, fmt.Errorf("unexpected output from vcgencmd %s", output)
+		return nil, fmt.Errorf("unexpected output from vcgencmd %s", output)
 	}
 	hex := strings.TrimSpace(strings.Replace(parts[1], "0x", "", 1))
 	throttlingStates, err := strconv.ParseInt(hex, 16, 64)
 	if err != nil {
-		return false, false, false, false, false, false, false, false, err
+		return nil, err
 	}
-	return throttlingStates&0x1 == 1, throttlingStates&0x2 == 1, throttlingStates&0x4 == 1, throttlingStates&0x8 == 1, throttlingStates&0x10000 == 1, throttlingStates&0x20000 == 1, throttlingStates&0x40000 == 1, throttlingStates&0x80000 == 1, nil
+	return map[string]bool{
+		Undervolt:               throttlingStates&0x1 != 0,
+		ArmFrequencyCapped:      throttlingStates&0x2 != 0,
+		CurrentlyThrottled:      throttlingStates&0x04 != 0,
+		SoftTempLimitActive:     throttlingStates&0x8 != 0,
+		UnderVoltOccurred:       throttlingStates&0x10000 != 0,
+		ArmFrequencyCapOccurred: throttlingStates&0x20000 != 0,
+		ThrottlingOccurred:      throttlingStates&0x40000 != 0,
+		SoftTempLimitOccurred:   throttlingStates&0x80000 != 0,
+	}, nil
 }

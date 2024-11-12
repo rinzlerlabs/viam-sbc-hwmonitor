@@ -1,3 +1,6 @@
 package utils
 
-var Version = "v0.0.2"
+const (
+	Version    = "0.0.3"
+	LoggerName = "raspi-sensors"
+)

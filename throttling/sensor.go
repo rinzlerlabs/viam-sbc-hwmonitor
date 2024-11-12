@@ -11,10 +11,13 @@ import (
 	"github.com/viam-soleng/viam-raspi-sensors/utils"
 )
 
-var Model = resource.NewModel("viam-soleng", "raspi", "throttling")
-var PrettyName = "Raspberry Pi Throttling Sensor"
-var Description = "A sensor that reports the throttling state of the Raspberry Pi."
-var Version = utils.Version
+var (
+	Model       = resource.NewModel("viam-soleng", "raspi", "throttling")
+	API         = sensor.API
+	PrettyName  = "Raspberry Pi Throttling Sensor"
+	Description = "A sensor that reports the throttling state of the Raspberry Pi."
+	Version     = utils.Version
+)
 
 type Config struct {
 	resource.Named
@@ -26,7 +29,7 @@ type Config struct {
 
 func init() {
 	resource.RegisterComponent(
-		sensor.API,
+		API,
 		Model,
 		resource.Registration[sensor.Sensor, *ComponentConfig]{Constructor: NewSensor})
 }
@@ -63,19 +66,19 @@ func (c *Config) Reconfigure(ctx context.Context, _ resource.Dependencies, conf 
 func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	undervolt, armFrequencyCapped, currentlyThrottled, softTempLimitActive, underVoltOccurred, armFrequencyCapOccurred, throttlingOccurred, softTempLimitOccurred, err := getThrottlingStates()
+	res, err := getThrottlingStates()
 	if err != nil {
 		return nil, err
 	}
 	return map[string]interface{}{
-		"undervolt":                 undervolt,
-		"arm_frequency_capped":      armFrequencyCapped,
-		"currently_throttled":       currentlyThrottled,
-		"soft_temp_limit_active":    softTempLimitActive,
-		"under_volt_occurred":       underVoltOccurred,
-		"arm_frequency_cap_occured": armFrequencyCapOccurred,
-		"throttling_occurred":       throttlingOccurred,
-		"soft_temp_limit_occurred":  softTempLimitOccurred,
+		"undervolt":                 res[Undervolt],
+		"arm_frequency_capped":      res[ArmFrequencyCapped],
+		"currently_throttled":       res[CurrentlyThrottled],
+		"soft_temp_limit_active":    res[SoftTempLimitActive],
+		"under_volt_occurred":       res[UnderVoltOccurred],
+		"arm_frequency_cap_occured": res[ArmFrequencyCapOccurred],
+		"throttling_occurred":       res[ThrottlingOccurred],
+		"soft_temp_limit_occurred":  res[SoftTempLimitOccurred],
 	}, nil
 }
 

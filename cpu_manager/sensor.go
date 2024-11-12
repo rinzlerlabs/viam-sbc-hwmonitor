@@ -13,10 +13,13 @@ import (
 	"github.com/viam-soleng/viam-raspi-sensors/utils"
 )
 
-var Model = resource.NewModel("viam-soleng", "raspi", "cpu_manager")
-var PrettyName = "Raspberry Pi CPU Manager"
-var Description = "A sensor that reports and manages the CPU configuration of the Raspberry Pi."
-var Version = utils.Version
+var (
+	Model       = resource.NewModel("viam-soleng", "raspi", "cpu_manager")
+	API         = sensor.API
+	PrettyName  = "Raspberry Pi CPU Manager"
+	Description = "A sensor that reports and manages the CPU configuration of the Raspberry Pi."
+	Version     = utils.Version
+)
 
 type Config struct {
 	resource.Named
@@ -32,7 +35,7 @@ type Config struct {
 
 func init() {
 	resource.RegisterComponent(
-		sensor.API,
+		API,
 		Model,
 		resource.Registration[sensor.Sensor, *ComponentConfig]{Constructor: NewSensor})
 }

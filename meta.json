@@ -29,5 +29,11 @@
       "model": "viam-soleng:raspi:pwm_fan"
     }
   ],
-  "entrypoint": "viam-raspi-sensors"
+  "build": {
+    "build": "make package",
+    "path": "bin/viam-raspi-sensors",
+    "arch": ["linux/amd64", "linux/arm64"]
+  },
+  "entrypoint": "bin/viam-raspi-sensors",
+  "first_run": ""
 }

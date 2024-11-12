@@ -16,10 +16,13 @@ import (
 	"github.com/viam-soleng/viam-raspi-sensors/utils"
 )
 
-var Model = resource.NewModel("viam-soleng", "raspi", "pwm_fan")
-var PrettyName = "Raspberry Pi PWM Fan Speed Controller"
-var Description = "A module to control the speed of a PWM fan connected to the Raspberry Pi based on a temperature table"
-var Version = utils.Version
+var (
+	Model       = resource.NewModel("viam-soleng", "raspi", "pwm_fan")
+	API         = sensor.API
+	PrettyName  = "Raspberry Pi PWM Fan Speed Controller"
+	Description = "A module to control the speed of a PWM fan connected to the Raspberry Pi based on a temperature table"
+	Version     = utils.Version
+)
 
 type Config struct {
 	resource.Named
@@ -38,7 +41,7 @@ type Config struct {
 
 func init() {
 	resource.RegisterComponent(
-		sensor.API,
+		API,
 		Model,
 		resource.Registration[sensor.Sensor, *CloudConfig]{Constructor: NewSensor})
 }

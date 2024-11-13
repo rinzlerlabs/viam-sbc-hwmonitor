@@ -2,8 +2,12 @@ package pwm_fan
 
 import (
 	"context"
+	"fmt"
+	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -24,16 +28,95 @@ var (
 	Version     = utils.Version
 )
 
+type fan struct {
+	pin         board.GPIOPin
+	internalFan *os.File
+}
+
+func newFan(deps resource.Dependencies, boardName string, pin string, useInternalFan bool) (*fan, error) {
+	if useInternalFan {
+		matches, err := filepath.Glob("/sys/class/hwmon/hwmon*/pwm1")
+		if err != nil {
+			return nil, err
+		}
+		if len(matches) == 0 {
+			return nil, fmt.Errorf("no pwm1 file found in /sys/class/hwmon/hwmon*/")
+		}
+		internalFan, err := os.OpenFile(matches[0], os.O_RDWR, 0644)
+		if err != nil {
+			return nil, err
+		}
+		return &fan{
+			internalFan: internalFan,
+			pin:         nil,
+		}, nil
+	}
+
+	b, err := board.FromDependencies(deps, boardName)
+	if err != nil {
+		return nil, err
+	}
+
+	fanPin, err := b.GPIOPinByName(pin)
+	if err != nil {
+		return nil, err
+	}
+
+	return &fan{
+		internalFan: nil,
+		pin:         fanPin,
+	}, nil
+}
+
+func (f *fan) SetSpeed(ctx context.Context, speed float64) error {
+	if f.internalFan != nil {
+		actualSpeed := int(speed * 255)
+		if actualSpeed > 255 {
+			actualSpeed = 255
+		}
+		fmt.Printf("Setting internal fan speed to %v\n", actualSpeed)
+		f.internalFan.Seek(0, 0)
+		_, err := f.internalFan.Write([]byte(strconv.Itoa(actualSpeed)))
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+	return f.pin.SetPWM(ctx, speed, nil)
+}
+
+func (f *fan) GetSpeed(ctx context.Context) (float64, error) {
+	if f.internalFan != nil {
+		f.internalFan.Seek(0, 0)
+		b := make([]byte, 10)
+		count, err := f.internalFan.Read(b)
+		if err != nil {
+			return 0, err
+		}
+		speed, err := strconv.ParseFloat(strings.TrimSpace(string(b[:count])), 64)
+		if err != nil {
+			return 0, err
+		}
+		return speed / 255, nil
+	}
+	return f.pin.PWM(ctx, nil)
+}
+
+func (f *fan) Close() {
+	if f.internalFan != nil {
+		f.internalFan.Close()
+	}
+}
+
 type Config struct {
 	resource.Named
 	mu               sync.RWMutex
 	logger           logging.Logger
 	cancelCtx        context.Context
 	cancelFunc       func()
-	FanPin           board.GPIOPin
-	Board            *board.Board
-	TemperatureTable map[float64]float64
-	Temps            []float64
+	fan              *fan
+	temperatureTable map[float64]float64
+	temps            []float64
 	monitor          func()
 	done             chan bool
 	wg               sync.WaitGroup
@@ -76,23 +159,13 @@ func (c *Config) Reconfigure(ctx context.Context, deps resource.Dependencies, co
 		return err
 	}
 
-	untypedBoard, err := deps.Lookup(resource.NewName(board.API, newConf.BoardName))
-	if err != nil {
-		c.logger.Errorf("Error looking up board: %s", err)
-		return err
-	}
-
-	board := untypedBoard.(board.Board)
-	fanPin, err := board.GPIOPinByName(newConf.FanPin)
-	if err != nil {
-		c.logger.Errorf("Error looking up fan pin: %s", err)
-		return err
-	}
-
 	// In case the module has changed name
 	c.Named = conf.ResourceName().AsNamed()
-	c.FanPin = fanPin
-	c.Board = &board
+	fan, err := newFan(deps, newConf.BoardName, newConf.FanPin, newConf.UseInternalFan)
+	if err != nil {
+		return err
+	}
+	c.fan = fan
 
 	tempTable := make(map[float64]float64)
 	temps := make([]float64, 0, len(newConf.TemperatureTable))
@@ -110,12 +183,8 @@ func (c *Config) Reconfigure(ctx context.Context, deps resource.Dependencies, co
 	}
 	sort.Sort(sort.Reverse(sort.Float64Slice(temps)))
 
-	c.Temps = temps
-	c.TemperatureTable = tempTable
-	if fanPin.SetPWMFreq(ctx, 1000, nil) != nil {
-		c.logger.Errorf("Error setting PWM frequency: %s", err)
-		return err
-	}
+	c.temps = temps
+	c.temperatureTable = tempTable
 
 	if c.monitor == nil {
 		c.monitor = func() {
@@ -133,15 +202,15 @@ func (c *Config) Reconfigure(ctx context.Context, deps resource.Dependencies, co
 						break
 					}
 					var desiredSpeed float64
-					for _, targetTemp := range c.Temps {
+					for _, targetTemp := range c.temps {
 						if currentTemp >= targetTemp {
-							desiredSpeed = c.TemperatureTable[targetTemp]
+							desiredSpeed = c.temperatureTable[targetTemp]
 							break
 						}
 					}
 
 					c.logger.Debugf("Current temperature: %f, desired speed: %f", currentTemp, desiredSpeed)
-					err = c.FanPin.SetPWM(ctx, desiredSpeed, nil)
+					err = c.fan.SetSpeed(ctx, desiredSpeed)
 					if err != nil {
 						c.logger.Errorf("Error setting fan speed: %s", err)
 					}
@@ -172,7 +241,7 @@ func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (ma
 		return nil, err
 	}
 
-	fan_speed, err := c.FanPin.PWM(ctx, nil)
+	fan_speed, err := c.fan.GetSpeed(ctx)
 	if err != nil {
 		c.logger.Errorf("Error getting fan speed: %s", err)
 		return nil, err
@@ -190,6 +259,7 @@ func (c *Config) Close(ctx context.Context) error {
 	c.logger.Infof("Notifying monitor to shut down")
 	c.wg.Wait()
 	c.logger.Info("Monitor shut down")
+	c.fan.Close()
 	return nil
 }
 

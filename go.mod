@@ -9,6 +9,7 @@ require (
 	github.com/thegreatco/viamutils v0.0.2
 	go.viam.com/rdk v0.47.2
 	go.viam.com/utils v0.1.108
+	golang.org/x/net v0.30.0
 )
 
 require (
@@ -134,7 +135,6 @@ require (
 	golang.org/x/exp v0.0.0-20240904232852-e7e105dedf7e // indirect
 	golang.org/x/image v0.19.0 // indirect
 	golang.org/x/mod v0.21.0 // indirect
-	golang.org/x/net v0.30.0 // indirect
 	golang.org/x/oauth2 v0.22.0 // indirect
 	golang.org/x/sync v0.8.0 // indirect
 	golang.org/x/sys v0.26.0 // indirect

@@ -1,16 +1,35 @@
 package pwm_fan
 
-import "errors"
+import (
+	"errors"
+
+	"github.com/viam-soleng/viam-raspi-sensors/utils"
+)
 
 type CloudConfig struct {
 	FanPin           string             `json:"fan_pin"`
 	TemperatureTable map[string]float64 `json:"temperature_table"`
 	BoardName        string             `json:"board_name"`
+	UseInternalFan   bool               `json:"use_internal_fan"`
 }
 
 func (conf *CloudConfig) Validate(path string) ([]string, error) {
-	if conf.FanPin == "" {
-		return nil, errors.New("fan_pin is required")
+	if conf.UseInternalFan {
+		boardType, err := utils.GetBoardType()
+		if err != nil {
+			return nil, err
+		}
+		if boardType != utils.RaspberryPi5 {
+			return nil, errors.New("use_internal_fan is only supported on Raspberry Pi 5")
+		}
+	} else {
+		if conf.FanPin == "" {
+			return nil, errors.New("fan_pin is required")
+		}
+
+		if conf.BoardName == "" {
+			return nil, errors.New("board_name is required")
+		}
 	}
 
 	if conf.TemperatureTable == nil {
@@ -21,10 +40,6 @@ func (conf *CloudConfig) Validate(path string) ([]string, error) {
 		return nil, errors.New("temperature_table must have at least one entry")
 	}
 
-	if conf.BoardName == "" {
-		return nil, errors.New("board_name is required")
-	}
-
 	// We need to make sure fan speed is between 0 and 100
 	// We don't need to check temperature because very low temperatures are possible on robots exposed to the elements
 	for _, speed := range conf.TemperatureTable {
@@ -32,5 +47,6 @@ func (conf *CloudConfig) Validate(path string) ([]string, error) {
 			return nil, errors.New("temperature_table must have speeds between 0 and 100")
 		}
 	}
+
 	return nil, nil
 }

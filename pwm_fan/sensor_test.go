@@ -4,13 +4,17 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	. "github.com/thegreatco/gotestutils"
+	sbc "github.com/thegreatco/sbcidentify"
 	"golang.org/x/net/context"
 )
 
 func TestGetInternalFanSpeed(t *testing.T) {
+	Test().RequiresRoot().RequiresBoardType(sbc.BoardTypeRaspberryPi5).ShouldSkip(t)
 	ctx := context.Background()
 	fan, err := newFan(nil, "", "", true)
 	assert.NoError(t, err)
+	defer fan.Close()
 	assert.NotNil(t, fan)
 	assert.NotNil(t, fan.internalFan)
 	speed, err := fan.GetSpeed(ctx)
@@ -19,9 +23,11 @@ func TestGetInternalFanSpeed(t *testing.T) {
 }
 
 func TestSetInternalFanSpeed(t *testing.T) {
+	Test().RequiresRoot().RequiresBoardType(sbc.BoardTypeRaspberryPi5).ShouldSkip(t)
 	ctx := context.Background()
 	fan, err := newFan(nil, "", "", true)
 	assert.NoError(t, err)
+	defer fan.Close()
 	assert.NotNil(t, fan)
 	assert.NotNil(t, fan.internalFan)
 

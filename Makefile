@@ -1,5 +1,5 @@
 BIN_PATH=bin
-BIN_NAME=viam-raspi-sensors
+BIN_NAME=rinzlerlabs-raspi-sensors
 ENTRY_POINT=module.go
 VERSION_PATH=utils/version.go
 PLATFORM=linux/arm64

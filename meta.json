@@ -1,39 +1,39 @@
 {
-  "module_id": "viam-soleng:viam-raspi-sensors",
+  "module_id": "rinzlerlabs:viam-raspi-sensors",
   "visibility": "public",
-  "url": "https://github.com/viam-soleng/viam-raspi-sensors",
+  "url": "https://github.com/rinzlerlabs/viam-raspi-sensors",
   "description": "A collection of sensors and utilities for the Rasperry Pi",
   "models": [
     {
       "api": "rdk:component:sensor",
-      "model": "viam-soleng:raspi:clocks"
+      "model": "rinzlerlabs:raspi:clocks"
     },
     {
       "api": "rdk:component:sensor",
-      "model": "viam-soleng:raspi:cpu_manager"
+      "model": "rinzlerlabs:raspi:cpu_manager"
     },
     {
       "api": "rdk:component:sensor",
-      "model": "viam-soleng:raspi:voltages"
+      "model": "rinzlerlabs:raspi:voltages"
     },
     {
       "api": "rdk:component:sensor",
-      "model": "viam-soleng:raspi:temperatures"
+      "model": "rinzlerlabs:raspi:temperatures"
     },
     {
       "api": "rdk:component:sensor",
-      "model": "viam-soleng:raspi:throttling"
+      "model": "rinzlerlabs:raspi:throttling"
     },
     {
       "api": "rdk:component:sensor",
-      "model": "viam-soleng:raspi:pwm_fan"
+      "model": "rinzlerlabs:raspi:pwm_fan"
     }
   ],
   "build": {
     "build": "make package",
-    "path": "bin/viam-raspi-sensors",
+    "path": "bin/rinzlerlabs-raspi-sensors",
     "arch": ["linux/amd64", "linux/arm64"]
   },
-  "entrypoint": "bin/viam-raspi-sensors",
+  "entrypoint": "bin/rinzlerlabs-raspi-sensors",
   "first_run": ""
 }

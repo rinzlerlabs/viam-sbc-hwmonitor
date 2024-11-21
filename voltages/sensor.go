@@ -8,11 +8,11 @@ import (
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
 
-	"github.com/viam-soleng/viam-raspi-sensors/utils"
+	"github.com/rinzlerlabs/viam-raspi-sensors/utils"
 )
 
 var (
-	Model       = resource.NewModel("viam-soleng", "raspi", "voltages")
+	Model       = resource.NewModel(utils.Namespace, "raspi", "voltages")
 	API         = sensor.API
 	PrettyName  = "Raspberry Pi Power Sensor"
 	Description = "A sensor that reports the voltages of the Raspberry Pi."

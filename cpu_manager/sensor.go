@@ -10,11 +10,11 @@ import (
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
 
-	"github.com/viam-soleng/viam-raspi-sensors/utils"
+	"github.com/rinzlerlabs/viam-raspi-sensors/utils"
 )
 
 var (
-	Model       = resource.NewModel("viam-soleng", "raspi", "cpu_manager")
+	Model       = resource.NewModel(utils.Namespace, "raspi", "cpu_manager")
 	API         = sensor.API
 	PrettyName  = "Raspberry Pi CPU Manager"
 	Description = "A sensor that reports and manages the CPU configuration of the Raspberry Pi."

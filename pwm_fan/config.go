@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	sbc "github.com/thegreatco/sbcidentify"
+	"github.com/thegreatco/sbcidentify/raspberrypi"
 )
 
 type CloudConfig struct {
@@ -19,7 +20,7 @@ func (conf *CloudConfig) Validate(path string) ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		if boardType != sbc.BoardTypeRaspberryPi5 {
+		if boardType != raspberrypi.RaspberryPi5B {
 			return nil, errors.New("use_internal_fan is only supported on Raspberry Pi 5")
 		}
 	} else {

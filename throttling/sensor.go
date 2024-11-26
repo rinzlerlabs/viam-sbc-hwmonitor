@@ -12,10 +12,10 @@ import (
 )
 
 var (
-	Model       = resource.NewModel(utils.Namespace, "raspi", "throttling")
+	Model       = resource.NewModel(utils.Namespace, "sbc", "throttling")
 	API         = sensor.API
-	PrettyName  = "Raspberry Pi Throttling Sensor"
-	Description = "A sensor that reports the throttling state of the Raspberry Pi."
+	PrettyName  = "SBC Throttling Sensor"
+	Description = "A sensor that reports the throttling state of an SBC"
 	Version     = utils.Version
 )
 
@@ -66,20 +66,7 @@ func (c *Config) Reconfigure(ctx context.Context, _ resource.Dependencies, conf 
 func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	res, err := getThrottlingStates()
-	if err != nil {
-		return nil, err
-	}
-	return map[string]interface{}{
-		"undervolt":                 res[Undervolt],
-		"arm_frequency_capped":      res[ArmFrequencyCapped],
-		"currently_throttled":       res[CurrentlyThrottled],
-		"soft_temp_limit_active":    res[SoftTempLimitActive],
-		"under_volt_occurred":       res[UnderVoltOccurred],
-		"arm_frequency_cap_occured": res[ArmFrequencyCapOccurred],
-		"throttling_occurred":       res[ThrottlingOccurred],
-		"soft_temp_limit_occurred":  res[SoftTempLimitOccurred],
-	}, nil
+	return getThrottlingStates(ctx)
 }
 
 func (c *Config) Close(ctx context.Context) error {

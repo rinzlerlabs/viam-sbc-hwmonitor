@@ -6,6 +6,7 @@ import (
 
 	"github.com/rinzlerlabs/viam-raspi-sensors/clocks"
 	"github.com/rinzlerlabs/viam-raspi-sensors/cpu_manager"
+	"github.com/rinzlerlabs/viam-raspi-sensors/cpu_monitor"
 	"github.com/rinzlerlabs/viam-raspi-sensors/pwm_fan"
 	"github.com/rinzlerlabs/viam-raspi-sensors/temperatures"
 	"github.com/rinzlerlabs/viam-raspi-sensors/throttling"
@@ -17,12 +18,13 @@ import (
 
 func main() {
 	logger := module.NewLoggerFromArgs(raspiutils.LoggerName)
-	logger.Infof("Starting RinzlerLabs RaspiSensors Module %v", raspiutils.Version)
+	logger.Infof("Starting RinzlerLabs SBC Sensors Module %v", raspiutils.Version)
 	moduleutils.AddModularResource(clocks.API, clocks.Model)
 	moduleutils.AddModularResource(cpu_manager.API, cpu_manager.Model)
 	moduleutils.AddModularResource(temperatures.API, temperatures.Model)
 	moduleutils.AddModularResource(throttling.API, throttling.Model)
 	moduleutils.AddModularResource(voltages.API, voltages.Model)
 	moduleutils.AddModularResource(pwm_fan.API, pwm_fan.Model)
+	moduleutils.AddModularResource(cpu_monitor.API, cpu_monitor.Model)
 	utils.ContextualMain(moduleutils.RunModule, logger)
 }

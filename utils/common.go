@@ -34,32 +34,33 @@ type fileTemperatureSensor struct {
 	path string
 }
 
-func (t *fileTemperatureSensor) Read(ctx context.Context) (float64, error) {
-	tempChan := make(chan float64)
+func ReadFileWithContext(ctx context.Context, path string) (string, error) {
+	fileChan := make(chan []byte)
 	errChan := make(chan error)
 	go func() {
-		data, err := os.ReadFile(t.path)
+		data, err := os.ReadFile(path)
 		if err != nil {
 			errChan <- err
 			return
 		}
-		temp, err := strconv.ParseFloat(strings.TrimSpace(string(data)), 64)
-		if err != nil {
-			errChan <- err
-			return
-		}
-		tempChan <- (temp / 1000)
+		fileChan <- data
 	}()
 	select {
-	case temp := <-tempChan:
-		return temp, nil
+	case data := <-fileChan:
+		return string(data), nil
 	case err := <-errChan:
-		return 0, err
-	case <-time.After(100 * time.Millisecond):
-		return 0, errors.New("timeout")
-	case <-ctx.Done():
-		return 0, ctx.Err()
+		return "", err
 	}
+}
+
+func (t *fileTemperatureSensor) Read(ctx context.Context) (float64, error) {
+	timeout, cancel := context.WithTimeout(ctx, 10*time.Millisecond)
+	defer cancel()
+	data, err := ReadFileWithContext(timeout, t.path)
+	if err != nil {
+		return 0, err
+	}
+	return strconv.ParseFloat(strings.TrimSpace(string(data)), 64)
 }
 
 func (t *fileTemperatureSensor) Name() string {

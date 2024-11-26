@@ -19,7 +19,7 @@ func TestParseClockFrequency(t *testing.T) {
 	}
 
 	for i, v := range s {
-		freq, err := parseClockFrequency(v)
+		freq, err := parseRasPiClockFrequency(v)
 		assert.NoError(t, err)
 		assert.Equal(t, a[i], freq)
 	}

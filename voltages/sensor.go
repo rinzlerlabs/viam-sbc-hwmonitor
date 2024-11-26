@@ -12,10 +12,10 @@ import (
 )
 
 var (
-	Model       = resource.NewModel(utils.Namespace, "raspi", "voltages")
+	Model       = resource.NewModel(utils.Namespace, "sbc", "voltages")
 	API         = sensor.API
-	PrettyName  = "Raspberry Pi Power Sensor"
-	Description = "A sensor that reports the voltages of the Raspberry Pi."
+	PrettyName  = "SBC Board Voltage Sensor"
+	Description = "A sensor that reports the voltages of an SBC"
 	Version     = utils.Version
 )
 

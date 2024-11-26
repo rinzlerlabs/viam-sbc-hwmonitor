@@ -14,10 +14,10 @@ import (
 )
 
 var (
-	Model       = resource.NewModel(utils.Namespace, "raspi", "cpu_manager")
+	Model       = resource.NewModel(utils.Namespace, "sbc", "cpu_manager")
 	API         = sensor.API
-	PrettyName  = "Raspberry Pi CPU Manager"
-	Description = "A sensor that reports and manages the CPU configuration of the Raspberry Pi."
+	PrettyName  = "SBC CPU Manager"
+	Description = "A sensor that reports and manages the CPU configuration of an SBC"
 	Version     = utils.Version
 )
 

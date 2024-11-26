@@ -12,10 +12,10 @@ import (
 )
 
 var (
-	Model       = resource.NewModel(utils.Namespace, "raspi", "clocks")
+	Model       = resource.NewModel(utils.Namespace, "sbc", "clocks")
 	API         = sensor.API
-	PrettyName  = "Raspberry Pi Clock Sensor"
-	Description = "A sensor that reports the clock frequencies of the Raspberry Pi."
+	PrettyName  = "SBC Clock Sensor"
+	Description = "A sensor that reports the clock frequencies of an SBC"
 	Version     = utils.Version
 )
 
@@ -66,7 +66,7 @@ func (c *Config) Reconfigure(ctx context.Context, _ resource.Dependencies, conf 
 func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	arm, core, h264, isp, v3d, uart, pwm, emmc, pixel, vec, hdmi, dpi, err := getClockFrequencies()
+	arm, core, h264, isp, v3d, uart, pwm, emmc, pixel, vec, hdmi, dpi, err := getRasPiClockFrequencies()
 	if err != nil {
 		return nil, err
 	}

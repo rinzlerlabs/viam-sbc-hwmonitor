@@ -7,69 +7,69 @@ import (
 	"strings"
 )
 
-func getClockFrequencies() (Arm, Core, H264, ISP, V3D, UART, PWM, EMMC, Pixel, Vec, HDMI, DPI int, Err error) {
+func getRasPiClockFrequencies() (Arm, Core, H264, ISP, V3D, UART, PWM, EMMC, Pixel, Vec, HDMI, DPI int, Err error) {
 	proc := exec.Command("vcgencmd", "measure_clock", "arm", "core", "h264", "isp", "v3d", "uart", "pwm", "emmc", "pixel", "vec", "hdmi", "dpi")
 	outputBytes, err := proc.Output()
 	if err != nil {
 		return 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, err
 	}
 	output := strings.Split(string(outputBytes), "\n")
-	arm, err := parseClockFrequency(output[0])
+	arm, err := parseRasPiClockFrequency(output[0])
 	if err != nil {
 		return 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, err
 	}
 
-	core, err := parseClockFrequency(output[1])
+	core, err := parseRasPiClockFrequency(output[1])
 	if err != nil {
 		return 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, err
 	}
 
-	h264, err := parseClockFrequency(output[2])
+	h264, err := parseRasPiClockFrequency(output[2])
 	if err != nil {
 		return 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, err
 	}
 
-	isp, err := parseClockFrequency(output[3])
+	isp, err := parseRasPiClockFrequency(output[3])
 	if err != nil {
 		return 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, err
 	}
 
-	v3d, err := parseClockFrequency(output[4])
+	v3d, err := parseRasPiClockFrequency(output[4])
 	if err != nil {
 		return 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, err
 	}
 
-	uart, err := parseClockFrequency(output[5])
+	uart, err := parseRasPiClockFrequency(output[5])
 	if err != nil {
 		return 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, err
 	}
 
-	pwm, err := parseClockFrequency(output[6])
+	pwm, err := parseRasPiClockFrequency(output[6])
 	if err != nil {
 		return 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, err
 	}
 
-	emmc, err := parseClockFrequency(output[7])
+	emmc, err := parseRasPiClockFrequency(output[7])
 	if err != nil {
 		return 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, err
 	}
 
-	pixel, err := parseClockFrequency(output[8])
+	pixel, err := parseRasPiClockFrequency(output[8])
 	if err != nil {
 		return 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, err
 	}
 
-	vec, err := parseClockFrequency(output[9])
+	vec, err := parseRasPiClockFrequency(output[9])
 	if err != nil {
 		return 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, err
 	}
 
-	hdmi, err := parseClockFrequency(output[10])
+	hdmi, err := parseRasPiClockFrequency(output[10])
 	if err != nil {
 		return 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, err
 	}
 
-	dpi, err := parseClockFrequency(output[11])
+	dpi, err := parseRasPiClockFrequency(output[11])
 	if err != nil {
 		return 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, err
 	}
@@ -77,7 +77,7 @@ func getClockFrequencies() (Arm, Core, H264, ISP, V3D, UART, PWM, EMMC, Pixel, V
 	return arm, core, h264, isp, v3d, uart, pwm, emmc, pixel, vec, hdmi, dpi, nil
 }
 
-func parseClockFrequency(clock string) (int, error) {
+func parseRasPiClockFrequency(clock string) (int, error) {
 	t := strings.TrimSpace(clock)
 	if !strings.HasPrefix(t, "frequency") {
 		return 0, fmt.Errorf("unexpected clock frequency line: %s", clock)

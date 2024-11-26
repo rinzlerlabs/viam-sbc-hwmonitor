@@ -14,8 +14,8 @@ import (
 var (
 	Model       = resource.NewModel(utils.Namespace, "raspi", "temperatures")
 	API         = sensor.API
-	PrettyName  = "Raspberry Pi Temperature Sensor"
-	Description = "A sensor that reports the temperatures of the Raspberry Pi."
+	PrettyName  = "SBC Temperature Sensor"
+	Description = "A sensor that reports the temperatures of the SBC, if available."
 	Version     = utils.Version
 )
 
@@ -66,18 +66,26 @@ func (c *Config) Reconfigure(ctx context.Context, _ resource.Dependencies, conf 
 func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	socTemp, err := utils.GetSoCTemperature()
+
+	temperatures, err := utils.GetTemperatures(ctx)
 	if err != nil {
 		return nil, err
 	}
-	pmicTemp, err := utils.GetPmicTemperature()
-	if err != nil {
-		return nil, err
+
+	res := make(map[string]interface{})
+	if temperatures.CPU != nil {
+		res["CPU"] = *temperatures.CPU
 	}
-	return map[string]interface{}{
-		"soc_temp":  socTemp,
-		"pmic_temp": pmicTemp,
-	}, nil
+
+	if temperatures.GPU != nil {
+		res["GPU"] = *temperatures.GPU
+	}
+
+	for key, value := range temperatures.Extra {
+		res[key] = value
+	}
+
+	return res, nil
 }
 
 func (c *Config) Close(ctx context.Context) error {

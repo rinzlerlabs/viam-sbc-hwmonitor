@@ -111,11 +111,16 @@ func (c *Config) Reconfigure(ctx context.Context, deps resource.Dependencies, co
 				case <-c.done:
 					return
 				default:
-					currentTemp, err := utils.GetSoCTemperature()
+					temperatures, err := utils.GetTemperatures(ctx)
 					if err != nil {
 						c.logger.Errorf("Error getting SoC temperature: %s", err)
 						break
 					}
+					if temperatures.CPU == nil {
+						c.logger.Errorf("Error getting CPU temperature")
+						break
+					}
+					currentTemp := *temperatures.CPU
 					var desiredSpeed float64
 					for _, targetTemp := range c.temps {
 						if currentTemp >= targetTemp {
@@ -150,11 +155,17 @@ func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (ma
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	currentTemp, err := utils.GetSoCTemperature()
+	temperatures, err := utils.GetTemperatures(ctx)
 	if err != nil {
-		c.logger.Errorf("Error getting SoC temperature: %s", err)
+		c.logger.Errorf("Error getting board temperatures: %s", err)
 		return nil, err
 	}
+
+	if temperatures.CPU == nil {
+		c.logger.Errorf("Error getting CPU temperature")
+		return nil, err
+	}
+	currentTemp := *temperatures.CPU
 
 	fan_speed, err := c.fan.GetSpeed(ctx)
 	if err != nil {

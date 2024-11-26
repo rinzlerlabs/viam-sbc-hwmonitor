@@ -3,8 +3,8 @@ package pwm_fan
 import (
 	"errors"
 
-	sbc "github.com/thegreatco/sbcidentify"
-	"github.com/thegreatco/sbcidentify/raspberrypi"
+	sbc "github.com/rinzlerlabs/sbcidentify"
+	"github.com/rinzlerlabs/sbcidentify/raspberrypi"
 )
 
 type CloudConfig struct {
@@ -16,11 +16,7 @@ type CloudConfig struct {
 
 func (conf *CloudConfig) Validate(path string) ([]string, error) {
 	if conf.UseInternalFan {
-		boardType, err := sbc.GetBoardType()
-		if err != nil {
-			return nil, err
-		}
-		if boardType != raspberrypi.RaspberryPi5B {
+		if !sbc.IsBoardType(raspberrypi.RaspberryPi5) {
 			return nil, errors.New("use_internal_fan is only supported on Raspberry Pi 5")
 		}
 	} else {

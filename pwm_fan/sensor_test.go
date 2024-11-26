@@ -3,9 +3,9 @@ package pwm_fan
 import (
 	"testing"
 
+	"github.com/rinzlerlabs/sbcidentify/raspberrypi"
 	"github.com/stretchr/testify/assert"
 	. "github.com/thegreatco/gotestutils"
-	"github.com/thegreatco/sbcidentify/raspberrypi"
 	"golang.org/x/net/context"
 )
 

@@ -10,11 +10,13 @@ import (
 )
 
 func TestCaptureCPUStats(t *testing.T) {
+	logger := logging.NewTestLogger(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	sensor := &Config{
 		stats:      make(map[string]interface{}),
 		cancelCtx:  ctx,
 		cancelFunc: cancel,
+		logger:     logger,
 	}
 
 	sensor.task = sensor.captureCPUStats

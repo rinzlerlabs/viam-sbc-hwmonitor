@@ -9,7 +9,7 @@ import (
 )
 
 func TestGetSystemClocks(t *testing.T) {
-	Test().RequiresSbc().ShouldSkip(t)
+	Test().RequiresRoot().RequiresSbc().ShouldSkip(t)
 	ctx := context.Background()
 	clocks, err := getSystemClocks(ctx)
 	assert.NoError(t, err)

@@ -5,9 +5,11 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	. "github.com/thegreatco/gotestutils"
 )
 
-func TestFoo(t *testing.T) {
+func TestGetSystemClocks(t *testing.T) {
+	Test().RequiresSbc().ShouldSkip(t)
 	ctx := context.Background()
 	clocks, err := getSystemClocks(ctx)
 	assert.NoError(t, err)

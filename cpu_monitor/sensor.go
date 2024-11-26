@@ -55,6 +55,8 @@ func NewSensor(ctx context.Context, deps resource.Dependencies, conf resource.Co
 	if err := b.Reconfigure(ctx, deps, conf); err != nil {
 		return nil, err
 	}
+
+	logger.Infof("Started %s %s", PrettyName, Version)
 	return &b, nil
 }
 
@@ -82,19 +84,24 @@ func (c *Config) Reconfigure(ctx context.Context, _ resource.Dependencies, conf 
 		c.sleepTime = time.Duration(newConf.SleepTimeMs) * time.Millisecond
 	}
 	c.task = c.captureCPUStats
-	c.logger.Info("Starting background task")
 	go c.task()
+	c.logger.Debugf("reconfigure complete %s", PrettyName)
 	return nil
 }
 
 func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
 	c.mu.RLock()
-	c.mu.RUnlock()
+	defer c.mu.RUnlock()
 	return c.stats, nil
 }
 
 func (c *Config) Close(ctx context.Context) error {
-	c.logger.Infof("Shutting down %s", PrettyName)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.logger.Info("shutting down")
+	c.cancelFunc()
+	c.wg.Wait()
+	c.logger.Info("shutdown complete")
 	return nil
 }
 
@@ -110,7 +117,7 @@ func (c *Config) captureCPUStats() {
 		c.logger.Errorf("Failed to read CPU stats: %v", err)
 		panic(err)
 	}
-	c.logger.Debug("Starting CPU stats main loop")
+	c.logger.Debug("starting CPU stats main loop")
 	for {
 		select {
 		case <-c.cancelCtx.Done():

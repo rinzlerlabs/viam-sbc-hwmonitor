@@ -25,7 +25,7 @@ clean-bin:
 	rm -rf $(BIN_PATH)
 
 package: clean-package build
-	tar -czf $(PACKAGE_NAME) $(BIN)
+	tar -czf $(PACKAGE_NAME) $(BIN) meta.json
 
 upload: package
 	@if [ "$(VERSION)" != "$(GIT_VERSION)" ]; then \

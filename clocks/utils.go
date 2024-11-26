@@ -1,94 +1,118 @@
 package clocks
 
 import (
+	"context"
+	"errors"
 	"fmt"
-	"os/exec"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
+
+	"github.com/rinzlerlabs/sbcidentify"
+	"github.com/rinzlerlabs/sbcidentify/nvidia"
+	"github.com/rinzlerlabs/sbcidentify/raspberrypi"
+	"github.com/rinzlerlabs/viam-raspi-sensors/utils"
 )
 
-func getRasPiClockFrequencies() (Arm, Core, H264, ISP, V3D, UART, PWM, EMMC, Pixel, Vec, HDMI, DPI int, Err error) {
-	proc := exec.Command("vcgencmd", "measure_clock", "arm", "core", "h264", "isp", "v3d", "uart", "pwm", "emmc", "pixel", "vec", "hdmi", "dpi")
-	outputBytes, err := proc.Output()
-	if err != nil {
-		return 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, err
-	}
-	output := strings.Split(string(outputBytes), "\n")
-	arm, err := parseRasPiClockFrequency(output[0])
-	if err != nil {
-		return 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, err
-	}
+var (
+	ErrNoGpuClockFound = errors.New("no valid GPU clock path found")
+)
 
-	core, err := parseRasPiClockFrequency(output[1])
-	if err != nil {
-		return 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, err
+func getSystemClocks(ctx context.Context) (map[string]interface{}, error) {
+	if sbcidentify.IsBoardType(raspberrypi.RaspberryPi) {
+		return getRasPiSystemClocks(ctx)
+	} else if sbcidentify.IsBoardType(nvidia.NVIDIA) {
+		return getJetsonSystemClocks(ctx)
 	}
-
-	h264, err := parseRasPiClockFrequency(output[2])
-	if err != nil {
-		return 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, err
-	}
-
-	isp, err := parseRasPiClockFrequency(output[3])
-	if err != nil {
-		return 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, err
-	}
-
-	v3d, err := parseRasPiClockFrequency(output[4])
-	if err != nil {
-		return 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, err
-	}
-
-	uart, err := parseRasPiClockFrequency(output[5])
-	if err != nil {
-		return 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, err
-	}
-
-	pwm, err := parseRasPiClockFrequency(output[6])
-	if err != nil {
-		return 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, err
-	}
-
-	emmc, err := parseRasPiClockFrequency(output[7])
-	if err != nil {
-		return 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, err
-	}
-
-	pixel, err := parseRasPiClockFrequency(output[8])
-	if err != nil {
-		return 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, err
-	}
-
-	vec, err := parseRasPiClockFrequency(output[9])
-	if err != nil {
-		return 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, err
-	}
-
-	hdmi, err := parseRasPiClockFrequency(output[10])
-	if err != nil {
-		return 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, err
-	}
-
-	dpi, err := parseRasPiClockFrequency(output[11])
-	if err != nil {
-		return 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, err
-	}
-
-	return arm, core, h264, isp, v3d, uart, pwm, emmc, pixel, vec, hdmi, dpi, nil
+	return nil, fmt.Errorf("board not supported")
 }
 
-func parseRasPiClockFrequency(clock string) (int, error) {
-	t := strings.TrimSpace(clock)
-	if !strings.HasPrefix(t, "frequency") {
-		return 0, fmt.Errorf("unexpected clock frequency line: %s", clock)
-	}
-	parts := strings.Split(t, "=")
-	if len(parts) != 2 {
-		return 0, fmt.Errorf("unexpected clock frequency line: %s", clock)
-	}
-	freq, err := strconv.Atoi(strings.TrimSpace(parts[1]))
+func getRasPiSystemClocks(ctx context.Context) (map[string]interface{}, error) {
+	cpuClocks, err := getSysDevicesSystemCPUClocks(ctx)
 	if err != nil {
-		return 0, fmt.Errorf("unexpected clock frequency line: %s", clock)
+		return nil, err
 	}
-	return freq, nil
+
+	return cpuClocks, nil
+}
+
+func getJetsonSystemClocks(ctx context.Context) (map[string]interface{}, error) {
+	cpuClocks, err := getSysDevicesSystemCPUClocks(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	gpuClock, err := getJetsonGPUClocks(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	cpuClocks["gpu"] = gpuClock
+	return cpuClocks, nil
+}
+
+func getSysDevicesSystemCPUClocks(ctx context.Context) (map[string]interface{}, error) {
+	dirs, err := filepath.Glob("/sys/devices/system/cpu/cpu[0-9]*")
+	if err != nil {
+		return nil, err
+	}
+
+	clockFrequencies := make(map[string]interface{})
+	for _, dir := range dirs {
+		cpu := filepath.Base(dir)
+		clockFrequencies[cpu], err = readIntFromFile(ctx, filepath.Join(dir, "cpufreq/cpuinfo_cur_freq"))
+		if err != nil {
+			return nil, err
+		}
+		clockFrequencies[cpu+"_min"], err = readIntFromFile(ctx, filepath.Join(dir, "cpufreq/cpuinfo_min_freq"))
+		if err != nil {
+			return nil, err
+		}
+		clockFrequencies[cpu+"_max"], err = readIntFromFile(ctx, filepath.Join(dir, "cpufreq/cpuinfo_max_freq"))
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return clockFrequencies, nil
+}
+
+func readIntFromFile(ctx context.Context, path string) (int, error) {
+	ctxWithTimeout, cancel := context.WithTimeout(ctx, 1*time.Millisecond)
+	defer cancel()
+	file, err := utils.ReadFileWithContext(ctxWithTimeout, path)
+	if err != nil {
+		return 0, err
+	}
+	i, err := strconv.Atoi(strings.TrimSpace(string(file)))
+	if err != nil {
+		return 0, err
+	}
+	return i, nil
+}
+
+func getJetsonGPUClocks(ctx context.Context) (int, error) {
+	paths := []string{
+		"/sys/devices/platform/bus@0/17000000.gpu/devfreq/17000000.gpu/cur_freq",
+		"/sys/devices/platform/17000000.ga10b/devfreq/17000000.ga10b/cur_freq",
+	}
+
+	for _, path := range paths {
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			continue
+		}
+		clock, err := utils.ReadFileWithContext(ctx, path)
+		if err != nil {
+			return 0, err
+		}
+		clockInt, err := strconv.Atoi(strings.TrimSpace(string(clock)))
+		if err != nil {
+			return 0, err
+		}
+		return clockInt, nil
+	}
+
+	return 0, ErrNoGpuClockFound
 }

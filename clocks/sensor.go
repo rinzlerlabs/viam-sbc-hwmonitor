@@ -66,24 +66,7 @@ func (c *Config) Reconfigure(ctx context.Context, _ resource.Dependencies, conf 
 func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	arm, core, h264, isp, v3d, uart, pwm, emmc, pixel, vec, hdmi, dpi, err := getRasPiClockFrequencies()
-	if err != nil {
-		return nil, err
-	}
-	return map[string]interface{}{
-		"arm":   arm,
-		"core":  core,
-		"h264":  h264,
-		"isp":   isp,
-		"v3d":   v3d,
-		"uart":  uart,
-		"pwm":   pwm,
-		"emmc":  emmc,
-		"pixel": pixel,
-		"vec":   vec,
-		"hdmi":  hdmi,
-		"dpi":   dpi,
-	}, nil
+	return getRasPiSystemClocks(ctx)
 }
 
 func (c *Config) Close(ctx context.Context) error {

@@ -18,6 +18,27 @@ var (
 	ErrBoardNotSupported = errors.New("board not supported")
 )
 
+func ReadFileWithContext(ctx context.Context, path string) (string, error) {
+	fileChan := make(chan []byte)
+	errChan := make(chan error)
+	go func() {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			errChan <- err
+			return
+		}
+		fileChan <- data
+	}()
+	select {
+	case <-ctx.Done():
+		return "", ctx.Err()
+	case data := <-fileChan:
+		return string(data), nil
+	case err := <-errChan:
+		return "", err
+	}
+}
+
 type systemTemperatures struct {
 	CPU   *float64
 	GPU   *float64
@@ -32,25 +53,6 @@ type temperatureReader interface {
 type fileTemperatureSensor struct {
 	name string
 	path string
-}
-
-func ReadFileWithContext(ctx context.Context, path string) (string, error) {
-	fileChan := make(chan []byte)
-	errChan := make(chan error)
-	go func() {
-		data, err := os.ReadFile(path)
-		if err != nil {
-			errChan <- err
-			return
-		}
-		fileChan <- data
-	}()
-	select {
-	case data := <-fileChan:
-		return string(data), nil
-	case err := <-errChan:
-		return "", err
-	}
 }
 
 func (t *fileTemperatureSensor) Read(ctx context.Context) (float64, error) {
@@ -145,6 +147,7 @@ func jetson_getTemperatures(ctx context.Context) (*systemTemperatures, error) {
 		if err != nil {
 			continue
 		}
+		temp = float64(int((temp/1000)*100)) / 100
 		switch sensor.Name() {
 		case "CPU":
 			systemTemps.CPU = &temp

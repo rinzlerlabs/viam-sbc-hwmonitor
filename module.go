@@ -7,6 +7,7 @@ import (
 	"github.com/rinzlerlabs/viam-raspi-sensors/clocks"
 	"github.com/rinzlerlabs/viam-raspi-sensors/cpu_manager"
 	"github.com/rinzlerlabs/viam-raspi-sensors/cpu_monitor"
+	"github.com/rinzlerlabs/viam-raspi-sensors/gpu_monitor"
 	"github.com/rinzlerlabs/viam-raspi-sensors/pwm_fan"
 	"github.com/rinzlerlabs/viam-raspi-sensors/temperatures"
 	"github.com/rinzlerlabs/viam-raspi-sensors/throttling"
@@ -26,5 +27,6 @@ func main() {
 	moduleutils.AddModularResource(voltages.API, voltages.Model)
 	moduleutils.AddModularResource(pwm_fan.API, pwm_fan.Model)
 	moduleutils.AddModularResource(cpu_monitor.API, cpu_monitor.Model)
+	moduleutils.AddModularResource(gpu_monitor.API, gpu_monitor.Model)
 	utils.ContextualMain(moduleutils.RunModule, logger)
 }

@@ -2,7 +2,6 @@ package cpu_monitor
 
 import (
 	"context"
-	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -85,10 +84,5 @@ func calculateUsage(prev, curr CPUCoreStats) float64 {
 		return 0.0
 	}
 
-	return roundValue((float64(totalDelta-idleDelta)/float64(totalDelta))*100, 2)
-}
-
-func roundValue(f float64, places int) float64 {
-	shift := math.Pow(10, float64(places))
-	return math.Round(f*shift) / shift
+	return utils.RoundValue((float64(totalDelta-idleDelta)/float64(totalDelta))*100, 2)
 }

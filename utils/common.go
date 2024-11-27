@@ -3,6 +3,7 @@ package utils
 import (
 	"context"
 	"errors"
+	"math"
 	"os"
 	"os/exec"
 	"strconv"
@@ -159,4 +160,9 @@ func jetson_getTemperatures(ctx context.Context) (*systemTemperatures, error) {
 	}
 
 	return systemTemps, nil
+}
+
+func RoundValue(f float64, places int) float64 {
+	shift := math.Pow(10, float64(places))
+	return math.Round(f*shift) / shift
 }

@@ -3,49 +3,62 @@ package gpu_monitor
 import (
 	"context"
 	"errors"
-	"os"
-	"strconv"
-	"strings"
-	"time"
 
+	"github.com/NVIDIA/go-nvml/pkg/nvml"
 	"github.com/rinzlerlabs/sbcidentify"
 	"github.com/rinzlerlabs/sbcidentify/nvidia"
-	"github.com/rinzlerlabs/viam-raspi-sensors/utils"
 )
 
 var (
 	ErrUnsupportedBoard = errors.New("gpu stats not supported on this board")
+	ErrInitializingNvml = errors.New("failed to initialize NVML")
+	ErrNvmlFailure      = errors.New("NVML failure")
+	nvmlInit            = false
 )
 
-func getGPUStats(ctx context.Context) (map[string]interface{}, error) {
-	if sbcidentify.IsBoardType(nvidia.NVIDIA) {
-		return getJetsonGPUStats(ctx)
-	}
-	return nil, ErrUnsupportedBoard
+type GpuMonitor interface {
+	GetGPUStats(ctx context.Context) (map[string]interface{}, error)
+	Close()
 }
 
-func getJetsonGPUStats(ctx context.Context) (map[string]interface{}, error) {
-	ctxWithTimeout, cancel := context.WithTimeout(ctx, 10*time.Millisecond)
-	defer cancel()
-	paths := []string{
-		"/sys/devices/platform/bus@0/17000000.gpu/load",
-		"/sys/devices/platform/17000000.ga10b/load",
+type nvidiaGpuMonitor struct{}
+
+func newNvidiaGpuMonitor() (GpuMonitor, error) {
+	if res := nvml.Init(); res != nvml.SUCCESS {
+		return nil, ErrInitializingNvml
+	}
+	return &nvidiaGpuMonitor{}, nil
+}
+
+func (m *nvidiaGpuMonitor) GetGPUStats(ctx context.Context) (map[string]interface{}, error) {
+	count, ret := nvml.DeviceGetCount()
+	if ret != nvml.SUCCESS {
+		return nil, ErrNvmlFailure
 	}
 	resp := make(map[string]interface{})
-	for _, path := range paths {
-		if _, err := os.Stat(path); os.IsNotExist(err) {
-			continue
+	for i := 0; i < count; i++ {
+		device, ret := nvml.DeviceGetHandleByIndex(i)
+		if ret != nvml.SUCCESS {
+			return nil, ErrNvmlFailure
 		}
-		loadStr, err := utils.ReadFileWithContext(ctxWithTimeout, path)
-		if err != nil {
-			return resp, err
+		name, _ := nvml.DeviceGetName(device)
+		utilization, ret := nvml.DeviceGetUtilizationRates(device)
+		if ret != nvml.SUCCESS {
+			return nil, ErrNvmlFailure
 		}
-		load, err := strconv.Atoi(strings.TrimSpace(string(loadStr)))
-		if err != nil {
-			return resp, err
-		}
-		resp["gpu"] = utils.RoundValue(float64(load)/10, 1)
-		return resp, nil
+		resp[name+"_gpu"] = float64(utilization.Gpu) / 10
+		resp[name+"_memory"] = float64(utilization.Memory) / 10
 	}
-	return resp, ErrUnsupportedBoard
+	return resp, nil
+}
+
+func (m *nvidiaGpuMonitor) Close() {
+	nvml.Shutdown()
+}
+
+func newGpuMonitor() (GpuMonitor, error) {
+	if sbcidentify.IsBoardType(nvidia.NVIDIA) {
+		return newNvidiaGpuMonitor()
+	}
+	return nil, ErrUnsupportedBoard
 }

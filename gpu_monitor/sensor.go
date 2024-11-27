@@ -112,13 +112,19 @@ func (c *Config) Ready(ctx context.Context, extra map[string]interface{}) (bool,
 func (c *Config) captureGPUStats() {
 	c.wg.Add(1)
 	defer c.wg.Done()
+	gpuMonitor, err := newGpuMonitor()
+	if err != nil {
+		c.logger.Warnf("Failed to initialize GPU monitor: %v", err)
+		return
+	}
+	defer gpuMonitor.Close()
 	c.logger.Debug("starting GPU stats main loop")
 	for {
 		select {
 		case <-c.cancelCtx.Done():
 			return
 		case <-time.After(c.sleepTime):
-			currStats, err := getGPUStats(c.cancelCtx)
+			currStats, err := gpuMonitor.GetGPUStats(c.cancelCtx)
 			if err != nil {
 				c.logger.Warnf("Failed to read GPU stats, skipping iteration: %v", err)
 				continue

@@ -3,6 +3,7 @@ module github.com/rinzlerlabs/viam-raspi-sensors
 go 1.23.2
 
 require (
+	github.com/NVIDIA/go-nvml v0.12.4-0
 	github.com/rinzlerlabs/sbcidentify v0.0.12
 	github.com/stretchr/testify v1.9.0
 	github.com/thegreatco/gotestutils v0.0.7

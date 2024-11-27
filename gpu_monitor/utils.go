@@ -35,20 +35,22 @@ func newNvidiaGpuMonitor(logger logging.Logger) (GpuMonitor, error) {
 func (m *nvidiaGpuMonitor) GetGPUStats(ctx context.Context) (map[string]interface{}, error) {
 	count, ret := nvml.DeviceGetCount()
 	if ret != nvml.SUCCESS {
-		m.logger.Info("Failed to get device count %v", ret)
+		m.logger.Infof("Failed to get device count %v", ret)
 		return nil, ErrNvmlFailure
 	}
+	m.logger.Infof("Found %v devices", count)
 	resp := make(map[string]interface{})
 	for i := 0; i < count; i++ {
 		device, ret := nvml.DeviceGetHandleByIndex(i)
 		if ret != nvml.SUCCESS {
-			m.logger.Info("Failed to get device handle %v", ret)
+			m.logger.Infof("Failed to get device handle %v", ret)
 			return nil, ErrNvmlFailure
 		}
 		name, _ := nvml.DeviceGetName(device)
+		m.logger.Infof("Device %v: %v", i, name)
 		utilization, ret := nvml.DeviceGetUtilizationRates(device)
 		if ret != nvml.SUCCESS {
-			m.logger.Info("Failed to get device utilization %v", ret)
+			m.logger.Infof("Failed to get device utilization %v", ret)
 			return nil, ErrNvmlFailure
 		}
 		resp[name+"_gpu"] = float64(utilization.Gpu) / 10

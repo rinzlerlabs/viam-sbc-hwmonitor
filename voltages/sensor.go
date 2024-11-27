@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	Model       = resource.NewModel(utils.Namespace, "sbc", "voltages")
+	Model       = resource.NewModel(utils.Namespace, "hwmonitor", "voltages")
 	API         = sensor.API
 	PrettyName  = "SBC Board Voltage Sensor"
 	Description = "A sensor that reports the voltages of an SBC"

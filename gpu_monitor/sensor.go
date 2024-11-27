@@ -14,7 +14,7 @@ import (
 )
 
 var (
-	Model       = resource.NewModel(utils.Namespace, "sbc", "gpu_monitor")
+	Model       = resource.NewModel(utils.Namespace, "hwmonitor", "gpu_monitor")
 	API         = sensor.API
 	PrettyName  = "SBC GPU Monitor Sensor"
 	Description = "A sensor that reports the GPU usage of an SBC"

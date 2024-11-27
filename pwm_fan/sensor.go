@@ -16,7 +16,7 @@ import (
 )
 
 var (
-	Model       = resource.NewModel(utils.Namespace, "sbc", "pwm_fan")
+	Model       = resource.NewModel(utils.Namespace, "hwmonitor", "pwm_fan")
 	API         = sensor.API
 	PrettyName  = "SBC PWM Fan Speed Controller"
 	Description = "A module to control the speed of a PWM fan connected to the SBC based on a temperature table"

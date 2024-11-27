@@ -6,31 +6,31 @@
   "models": [
     {
       "api": "rdk:component:sensor",
-      "model": "rinzlerlabs:hwmon:clocks"
+      "model": "rinzlerlabs:hwmonitor:clocks"
     },
     {
       "api": "rdk:component:sensor",
-      "model": "rinzlerlabs:hwmon:cpu_manager"
+      "model": "rinzlerlabs:hwmonitor:cpu_manager"
     },
     {
       "api": "rdk:component:sensor",
-      "model": "rinzlerlabs:hwmon:voltages"
+      "model": "rinzlerlabs:hwmonitor:voltages"
     },
     {
       "api": "rdk:component:sensor",
-      "model": "rinzlerlabs:hwmon:temperatures"
+      "model": "rinzlerlabs:hwmonitor:temperatures"
     },
     {
       "api": "rdk:component:sensor",
-      "model": "rinzlerlabs:hwmon:throttling"
+      "model": "rinzlerlabs:hwmonitor:throttling"
     },
     {
       "api": "rdk:component:sensor",
-      "model": "rinzlerlabs:hwmon:pwm_fan"
+      "model": "rinzlerlabs:hwmonitor:pwm_fan"
     },
     {
       "api": "rdk:component:sensor",
-      "model": "rinzlerlabs:hwmon:cpu_monitor"
+      "model": "rinzlerlabs:hwmonitor:cpu_monitor"
     }
   ],
   "build": {

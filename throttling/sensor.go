@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	Model       = resource.NewModel(utils.Namespace, "sbc", "throttling")
+	Model       = resource.NewModel(utils.Namespace, "hwmonitor", "throttling")
 	API         = sensor.API
 	PrettyName  = "SBC Throttling Sensor"
 	Description = "A sensor that reports the throttling state of an SBC"

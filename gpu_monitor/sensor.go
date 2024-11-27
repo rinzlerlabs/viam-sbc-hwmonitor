@@ -112,7 +112,7 @@ func (c *Config) Ready(ctx context.Context, extra map[string]interface{}) (bool,
 func (c *Config) captureGPUStats() {
 	c.wg.Add(1)
 	defer c.wg.Done()
-	gpuMonitor, err := newGpuMonitor()
+	gpuMonitor, err := newGpuMonitor(c.logger)
 	if err != nil {
 		c.logger.Warnf("Failed to initialize GPU monitor: %v", err)
 		return

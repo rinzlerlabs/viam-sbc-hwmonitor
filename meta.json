@@ -1,43 +1,43 @@
 {
-  "module_id": "rinzlerlabs:viam-raspi-sensors",
+  "module_id": "rinzlerlabs:sbc-hwmonitor",
   "visibility": "public",
   "url": "https://github.com/rinzlerlabs/viam-raspi-sensors",
   "description": "A collection of sensors and utilities for single board computers (SBC) like the Raspberry Pi or NVIDIA Jetson Nano. The values in Readings should not be considered stable at this time. This module is under active development.",
   "models": [
     {
       "api": "rdk:component:sensor",
-      "model": "rinzlerlabs:sbc:clocks"
+      "model": "rinzlerlabs:hwmon:clocks"
     },
     {
       "api": "rdk:component:sensor",
-      "model": "rinzlerlabs:sbc:cpu_manager"
+      "model": "rinzlerlabs:hwmon:cpu_manager"
     },
     {
       "api": "rdk:component:sensor",
-      "model": "rinzlerlabs:sbc:voltages"
+      "model": "rinzlerlabs:hwmon:voltages"
     },
     {
       "api": "rdk:component:sensor",
-      "model": "rinzlerlabs:sbc:temperatures"
+      "model": "rinzlerlabs:hwmon:temperatures"
     },
     {
       "api": "rdk:component:sensor",
-      "model": "rinzlerlabs:sbc:throttling"
+      "model": "rinzlerlabs:hwmon:throttling"
     },
     {
       "api": "rdk:component:sensor",
-      "model": "rinzlerlabs:sbc:pwm_fan"
+      "model": "rinzlerlabs:hwmon:pwm_fan"
     },
     {
       "api": "rdk:component:sensor",
-      "model": "rinzlerlabs:sbc:cpu_monitor"
+      "model": "rinzlerlabs:hwmon:cpu_monitor"
     }
   ],
   "build": {
     "build": "make package",
-    "path": "rinzlerlabs-sbc-sensors.tar.gz",
+    "path": "rinzlerlabs-sbc-hwmonitor.tar.gz",
     "arch": ["linux/arm64"]
   },
-  "entrypoint": "bin/rinzlerlabs-sbc-sensors",
+  "entrypoint": "bin/rinzlerlabs-sbc-hwmonitor",
   "first_run": ""
 }

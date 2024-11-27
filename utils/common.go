@@ -34,10 +34,18 @@ func ReadFileWithContext(ctx context.Context, path string) (string, error) {
 	case <-ctx.Done():
 		return "", ctx.Err()
 	case data := <-fileChan:
-		return string(data), nil
+		return strings.TrimSpace(string(data)), nil
 	case err := <-errChan:
 		return "", err
 	}
+}
+
+func ReadInt64FromFileWithContext(ctx context.Context, path string) (int64, error) {
+	data, err := ReadFileWithContext(ctx, path)
+	if err != nil {
+		return 0, err
+	}
+	return strconv.ParseInt(strings.TrimSpace(data), 10, 64)
 }
 
 type systemTemperatures struct {

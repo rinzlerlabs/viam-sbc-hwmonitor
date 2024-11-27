@@ -1,5 +1,5 @@
 BIN_PATH=bin
-BIN_NAME=rinzlerlabs-sbc-sensors
+BIN_NAME=rinzlerlabs-sbc-hwmonitor
 ENTRY_POINT=module.go
 VERSION_PATH=utils/version.go
 PLATFORM=linux/arm64

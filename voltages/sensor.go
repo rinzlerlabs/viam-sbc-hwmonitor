@@ -66,16 +66,7 @@ func (c *Config) Reconfigure(ctx context.Context, _ resource.Dependencies, conf 
 func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	core, sdram_c, sdram_i, sdram_p, err := getVoltages()
-	if err != nil {
-		return nil, err
-	}
-	return map[string]interface{}{
-		"core":    core,
-		"sdram_c": sdram_c,
-		"sdram_i": sdram_i,
-		"sdram_p": sdram_p,
-	}, nil
+	return getVoltages(ctx)
 }
 
 func (c *Config) Close(ctx context.Context) error {

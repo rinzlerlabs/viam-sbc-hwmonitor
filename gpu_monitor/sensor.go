@@ -87,6 +87,7 @@ func (c *Config) Reconfigure(ctx context.Context, _ resource.Dependencies, conf 
 	if collectionSize < 1 {
 		collectionSize = 1
 	}
+	c.logger.Infof("Sleep time: %v, Collection size: %v", c.sleepTime, collectionSize)
 	c.stats = utils.NewCappedCollection[sample](collectionSize)
 	c.task = c.captureGPUStats
 	go c.task()

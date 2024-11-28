@@ -25,6 +25,7 @@ type Config struct {
 	logger     logging.Logger
 	cancelCtx  context.Context
 	cancelFunc func()
+	sensors    []powerSensor
 }
 
 func init() {
@@ -60,17 +61,48 @@ func (c *Config) Reconfigure(ctx context.Context, _ resource.Dependencies, conf 
 	// In case the module has changed name
 	c.Named = conf.ResourceName().AsNamed()
 
+	// Close any existing sensors
+	if c.sensors != nil {
+		for _, s := range c.sensors {
+			s.Close()
+		}
+	}
+
+	// Create new sensors
+	sensors, err := getPowerSensors(ctx, c.logger)
+	if err != nil {
+		return err
+	}
+	c.sensors = sensors
+
 	return nil
 }
 
 func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	return getVoltages(ctx)
+	ret := make(map[string]interface{})
+	for _, s := range c.sensors {
+		name := s.GetName()
+		for k, v := range s.GetReadingMap() {
+			ret[name+"_"+k] = v
+		}
+	}
+	return ret, nil
 }
 
 func (c *Config) Close(ctx context.Context) error {
 	c.logger.Infof("Shutting down %s", PrettyName)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.cancelFunc != nil {
+		c.cancelFunc()
+	}
+	for _, s := range c.sensors {
+		c.logger.Debugf("Closing sensor %s", s.GetName())
+		s.Close()
+	}
+	c.logger.Infof("Shut down %s", PrettyName)
 	return nil
 }
 

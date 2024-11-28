@@ -48,6 +48,14 @@ func ReadInt64FromFileWithContext(ctx context.Context, path string) (int64, erro
 	return strconv.ParseInt(strings.TrimSpace(data), 10, 64)
 }
 
+func ReadBoolFromFileWithContext(ctx context.Context, path string) (bool, error) {
+	data, err := ReadFileWithContext(ctx, path)
+	if err != nil {
+		return false, err
+	}
+	return strings.TrimSpace(data) == "1", nil
+}
+
 type systemTemperatures struct {
 	CPU   *float64
 	GPU   *float64

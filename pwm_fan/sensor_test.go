@@ -3,14 +3,14 @@ package pwm_fan
 import (
 	"testing"
 
-	"github.com/rinzlerlabs/sbcidentify/raspberrypi"
+	"github.com/rinzlerlabs/sbcidentify/boardtype"
+	. "github.com/rinzlerlabs/sbcidentify/test"
 	"github.com/stretchr/testify/assert"
-	. "github.com/thegreatco/gotestutils"
 	"golang.org/x/net/context"
 )
 
 func TestGetInternalFanSpeed(t *testing.T) {
-	Test().RequiresRoot().RequiresBoardType(raspberrypi.RaspberryPi5B).ShouldSkip(t)
+	Test().RequiresRoot().RequiresBoardType(boardtype.RaspberryPi5B).ShouldSkip(t)
 	ctx := context.Background()
 	fan, err := newFan(nil, "", "", true)
 	assert.NoError(t, err)
@@ -23,7 +23,7 @@ func TestGetInternalFanSpeed(t *testing.T) {
 }
 
 func TestSetInternalFanSpeed(t *testing.T) {
-	Test().RequiresRoot().RequiresBoardType(raspberrypi.RaspberryPi5B).ShouldSkip(t)
+	Test().RequiresRoot().RequiresBoardType(boardtype.RaspberryPi5B).ShouldSkip(t)
 	ctx := context.Background()
 	fan, err := newFan(nil, "", "", true)
 	assert.NoError(t, err)

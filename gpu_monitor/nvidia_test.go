@@ -4,14 +4,14 @@ import (
 	"context"
 	"testing"
 
-	"github.com/rinzlerlabs/sbcidentify/nvidia"
+	"github.com/rinzlerlabs/sbcidentify/boardtype"
+	. "github.com/rinzlerlabs/sbcidentify/test"
 	"github.com/stretchr/testify/assert"
-	. "github.com/thegreatco/gotestutils"
 	"go.viam.com/rdk/logging"
 )
 
 func TestNvidiaGpuGetsFrequencies(t *testing.T) {
-	Test().RequiresBoardType(nvidia.NVIDIA).ShouldSkip(t)
+	Test().RequiresBoardType(boardtype.NVIDIA).ShouldSkip(t)
 	ctx := context.Background()
 	logger := logging.NewTestLogger(t)
 	nvidia, err := newNvidiaGpuMonitor(ctx, logger)

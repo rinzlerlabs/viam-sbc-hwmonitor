@@ -69,7 +69,7 @@ func (c *Config) Reconfigure(ctx context.Context, _ resource.Dependencies, conf 
 	}
 
 	// Create new sensors
-	sensors, err := getPowerSensors(ctx, c.logger)
+	sensors, err := getPowerSensors(c.cancelCtx, c.logger)
 	if err != nil {
 		return err
 	}

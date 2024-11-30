@@ -10,8 +10,7 @@ import (
 	"time"
 
 	"github.com/rinzlerlabs/sbcidentify"
-	"github.com/rinzlerlabs/sbcidentify/nvidia"
-	"github.com/rinzlerlabs/sbcidentify/raspberrypi"
+	"github.com/rinzlerlabs/sbcidentify/boardtype"
 	"github.com/rinzlerlabs/viam-raspi-sensors/utils"
 )
 
@@ -27,9 +26,9 @@ const (
 )
 
 func getThrottlingStates(ctx context.Context) (map[string]interface{}, error) {
-	if sbcidentify.IsBoardType(raspberrypi.RaspberryPi) {
+	if sbcidentify.IsBoardType(boardtype.RaspberryPi) {
 		return getRasPiThrottlingStates(ctx)
-	} else if sbcidentify.IsBoardType(nvidia.NVIDIA) {
+	} else if sbcidentify.IsBoardType(boardtype.NVIDIA) {
 		return getJetsonThrottlingStates(ctx)
 	}
 	return nil, fmt.Errorf("board not supported")

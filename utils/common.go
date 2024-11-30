@@ -11,8 +11,7 @@ import (
 	"time"
 
 	"github.com/rinzlerlabs/sbcidentify"
-	"github.com/rinzlerlabs/sbcidentify/nvidia"
-	"github.com/rinzlerlabs/sbcidentify/raspberrypi"
+	"github.com/rinzlerlabs/sbcidentify/boardtype"
 )
 
 var (
@@ -122,9 +121,9 @@ var raspberryPiTemperatureSensors = []temperatureReader{
 }
 
 func GetTemperatures(ctx context.Context) (*systemTemperatures, error) {
-	if sbcidentify.IsBoardType(raspberrypi.RaspberryPi) {
+	if sbcidentify.IsBoardType(boardtype.RaspberryPi) {
 		return rpi_getTemperatures(ctx)
-	} else if sbcidentify.IsBoardType(nvidia.Jetson) {
+	} else if sbcidentify.IsBoardType(boardtype.Jetson) {
 		return jetson_getTemperatures(ctx)
 	} else {
 		return nil, ErrBoardNotSupported

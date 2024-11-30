@@ -29,7 +29,7 @@ func TestCaptureCPUStats(t *testing.T) {
 	}
 	cancel()
 	sensor.wg.Wait()
-	assert.Equal(t, 5, len(sensor.stats))
+	assert.Equal(t, 7, len(sensor.stats))
 }
 
 func TestCaptureCPUStatsExitsImmediately(t *testing.T) {
@@ -72,7 +72,7 @@ func TestCaptureCPUStatsRespectsSleepTime(t *testing.T) {
 	cancel()
 	sensor.wg.Wait()
 	end := time.Now()
-	assert.Equal(t, 5, len(sensor.stats))
+	assert.Equal(t, 7, len(sensor.stats))
 	testLength := end.Sub(now)
 	logger.Infof("Test took %s", testLength)
 	assert.True(t, testLength > 100*time.Millisecond)

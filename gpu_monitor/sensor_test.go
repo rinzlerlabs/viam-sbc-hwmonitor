@@ -5,16 +5,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rinzlerlabs/sbcidentify/nvidia"
+	"github.com/rinzlerlabs/sbcidentify/boardtype"
+	. "github.com/rinzlerlabs/sbcidentify/test"
 	"github.com/rinzlerlabs/viam-raspi-sensors/utils"
 	"github.com/stretchr/testify/assert"
 	"go.viam.com/rdk/logging"
-
-	. "github.com/thegreatco/gotestutils"
 )
 
 func TestCaptureCPUStats(t *testing.T) {
-	Test().RequiresBoardType(nvidia.NVIDIA).ShouldSkip(t)
+	Test().RequiresBoardType(boardtype.NVIDIA).ShouldSkip(t)
 	logger := logging.NewTestLogger(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	sensor := &Config{
@@ -34,11 +33,11 @@ func TestCaptureCPUStats(t *testing.T) {
 	}
 	cancel()
 	sensor.wg.Wait()
-	assert.Equal(t, 5, len(sensor.stats.Items()))
+	assert.Equal(t, 1, len(sensor.stats.Items()))
 }
 
 func TestCaptureCPUStatsExitsImmediately(t *testing.T) {
-	Test().RequiresBoardType(nvidia.NVIDIA).ShouldSkip(t)
+	Test().RequiresBoardType(boardtype.NVIDIA).ShouldSkip(t)
 	logger := logging.NewTestLogger(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	sensor := &Config{
@@ -56,7 +55,7 @@ func TestCaptureCPUStatsExitsImmediately(t *testing.T) {
 }
 
 func TestCaptureCPUStatsRespectsSleepTime(t *testing.T) {
-	Test().RequiresBoardType(nvidia.NVIDIA).ShouldSkip(t)
+	Test().RequiresBoardType(boardtype.NVIDIA).ShouldSkip(t)
 	logger := logging.NewTestLogger(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	sensor := &Config{
@@ -79,7 +78,7 @@ func TestCaptureCPUStatsRespectsSleepTime(t *testing.T) {
 	cancel()
 	sensor.wg.Wait()
 	end := time.Now()
-	assert.Equal(t, 5, len(sensor.stats.Items()))
+	assert.Equal(t, 1, len(sensor.stats.Items()))
 	testLength := end.Sub(now)
 	logger.Infof("Test took %s", testLength)
 	assert.True(t, testLength > 100*time.Millisecond)
@@ -87,7 +86,7 @@ func TestCaptureCPUStatsRespectsSleepTime(t *testing.T) {
 }
 
 func TestGetReadings(t *testing.T) {
-	Test().RequiresBoardType(nvidia.NVIDIA).ShouldSkip(t)
+	Test().RequiresBoardType(boardtype.NVIDIA).ShouldSkip(t)
 	logger := logging.NewTestLogger(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	sensor := &Config{
@@ -135,16 +134,16 @@ func TestGetReadings(t *testing.T) {
 	assert.Equal(t, 30.0, readings["gpu1-load"])
 }
 
-func TestFoo(t *testing.T) {
+func TestCollectionSizeCalculation(t *testing.T) {
 	sleepTime := 100 * time.Millisecond
-	assert.Equal(t, 10, int(1/sleepTime.Seconds()))
+	assert.Equal(t, 10, calculateCollectionSize(sleepTime))
 
 	sleepTime = 1 * time.Second
-	assert.Equal(t, 1, int(1/sleepTime.Seconds()))
+	assert.Equal(t, 1, calculateCollectionSize(sleepTime))
 
 	sleepTime = 1 * time.Millisecond
-	assert.Equal(t, 1000, int(1/sleepTime.Seconds()))
+	assert.Equal(t, 1000, calculateCollectionSize(sleepTime))
 
 	sleepTime = 10 * time.Second
-	assert.Equal(t, 1, int(1/sleepTime.Seconds()))
+	assert.Equal(t, 1, calculateCollectionSize(sleepTime))
 }

@@ -2,13 +2,20 @@ package voltages
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"math"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/rinzlerlabs/viam-raspi-sensors/utils"
 	"go.viam.com/rdk/logging"
+)
+
+var (
+	ErrIgnoredSensor = errors.New("ignored sensor")
 )
 
 type powerSensor interface {
@@ -51,6 +58,7 @@ func (s *jetsonPowerSensor) StartUpdating() error {
 		for {
 			select {
 			case <-s.cancelCtx.Done():
+				s.logger.Infof("Stopping background update for %s", s.name)
 				return
 			case <-time.After(updateInterval):
 				rawVoltage, vErr := utils.ReadInt64FromFileWithContext(s.cancelCtx, s.voltageFile)
@@ -59,7 +67,7 @@ func (s *jetsonPowerSensor) StartUpdating() error {
 				criticalOverCurrentAlarm, cocaErr := utils.ReadBoolFromFileWithContext(s.cancelCtx, s.criticalOverCurrentAlarmFile)
 				current := float64(rawCurrent) / 1000
 				voltage := float64(rawVoltage) / 1000
-				s.logger.Debugf("Voltage: %v, Current: %v, OverCurrentAlarm: %v, CriticalOverCurrentAlarm: %v", voltage, current, overCurrentAlarm, criticalOverCurrentAlarm)
+				s.logger.Infof("Voltage: %v, Current: %v, OverCurrentAlarm: %v, CriticalOverCurrentAlarm: %v", voltage, current, overCurrentAlarm, criticalOverCurrentAlarm)
 				s.mu.Lock()
 				if vErr == nil {
 					s.voltage = voltage
@@ -68,7 +76,7 @@ func (s *jetsonPowerSensor) StartUpdating() error {
 					s.current = current
 				}
 				if vErr == nil && cErr == nil {
-					s.power = voltage * current
+					s.power = math.Round(voltage*current*100) / 100
 				}
 				if ocaErr == nil {
 					s.overCurrentAlarm = overCurrentAlarm
@@ -79,14 +87,17 @@ func (s *jetsonPowerSensor) StartUpdating() error {
 				s.mu.Unlock()
 			}
 		}
+
 	}
 	go s.updateTask()
 	return nil
 }
 
 func (s *jetsonPowerSensor) Close() {
+	s.logger.Infof("Shutting down %s", s.name)
 	s.cancelFunc()
 	s.wg.Wait()
+	s.logger.Infof("Shutdown complete")
 }
 
 func (s *jetsonPowerSensor) GetName() string {
@@ -115,6 +126,9 @@ func newJetsonPowerSensor(ctx context.Context, logger logging.Logger, index int)
 	name, err := utils.ReadFileWithContext(ctx, fmt.Sprintf("/sys/bus/i2c/drivers/ina3221/1-0040/hwmon/hwmon1/in%v_label", index))
 	if err != nil {
 		return nil, err
+	}
+	if strings.Contains(name, "sum") {
+		return nil, ErrIgnoredSensor
 	}
 	logger.Infof("Creating Jetson Power Sensor: %s", name)
 	ctx, cancel := context.WithCancel(ctx)
@@ -145,6 +159,10 @@ func getJetsonPowerSensors(ctx context.Context, logger logging.Logger) ([]powerS
 			return nil, err
 		}
 		sensor, err := newJetsonPowerSensor(ctx, logger, index)
+		if err == ErrIgnoredSensor {
+			logger.Debugf("Ignoring sensor %s", index)
+			continue
+		}
 		if err != nil {
 			return nil, err
 		}

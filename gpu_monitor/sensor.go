@@ -83,16 +83,21 @@ func (c *Config) Reconfigure(ctx context.Context, _ resource.Dependencies, conf 
 	if newConf.SleepTimeMs > 0 {
 		c.sleepTime = time.Duration(newConf.SleepTimeMs) * time.Millisecond
 	}
-	collectionSize := int(1 / c.sleepTime.Seconds())
-	if collectionSize < 1 {
-		collectionSize = 1
-	}
+	collectionSize := calculateCollectionSize(c.sleepTime)
 	c.logger.Infof("Sleep time: %v, Collection size: %v", c.sleepTime, collectionSize)
 	c.stats = utils.NewCappedCollection[sample](collectionSize)
 	c.task = c.captureGPUStats
 	go c.task()
 	c.logger.Debugf("reconfigure complete %s", PrettyName)
 	return nil
+}
+
+func calculateCollectionSize(sleepTime time.Duration) int {
+	collectionSize := int(1 / sleepTime.Seconds())
+	if collectionSize < 1 {
+		collectionSize = 1
+	}
+	return collectionSize
 }
 
 func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {

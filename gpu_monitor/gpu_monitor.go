@@ -5,7 +5,7 @@ import (
 	"errors"
 
 	"github.com/rinzlerlabs/sbcidentify"
-	"github.com/rinzlerlabs/sbcidentify/nvidia"
+	"github.com/rinzlerlabs/sbcidentify/boardtype"
 	"go.viam.com/rdk/logging"
 )
 
@@ -19,7 +19,7 @@ type GpuMonitor interface {
 }
 
 func newGpuMonitor(ctx context.Context, logger logging.Logger) (GpuMonitor, error) {
-	if sbcidentify.IsBoardType(nvidia.NVIDIA) {
+	if sbcidentify.IsBoardType(boardtype.NVIDIA) {
 		return newNvidiaGpuMonitor(ctx, logger)
 	}
 	return nil, ErrUnsupportedBoard

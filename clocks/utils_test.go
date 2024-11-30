@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
+	. "github.com/rinzlerlabs/sbcidentify/test"
 	"github.com/stretchr/testify/assert"
-	. "github.com/thegreatco/gotestutils"
 )
 
 func TestGetSystemClocks(t *testing.T) {

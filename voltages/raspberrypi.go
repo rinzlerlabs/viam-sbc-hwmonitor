@@ -64,8 +64,6 @@ func (s *raspberryPiPowerSensor) GetReadingMap() map[string]interface{} {
 	defer s.mu.RUnlock()
 	return map[string]interface{}{
 		"voltage": s.voltage,
-		"current": s.current,
-		"power":   s.power,
 	}
 }
 

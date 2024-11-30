@@ -5,11 +5,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rinzlerlabs/sbcidentify/boardtype"
+	. "github.com/rinzlerlabs/sbcidentify/test"
 	"github.com/stretchr/testify/assert"
 	"go.viam.com/rdk/logging"
 )
 
 func TestFoo(t *testing.T) {
+	Test().RequiresBoardType(boardtype.NVIDIA).ShouldSkip(t)
 	logger := logging.NewTestLogger(t)
 	ctx := context.Background()
 	res, err := getJetsonPowerSensors(ctx, logger)

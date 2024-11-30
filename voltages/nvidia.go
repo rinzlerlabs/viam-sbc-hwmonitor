@@ -67,7 +67,7 @@ func (s *jetsonPowerSensor) StartUpdating() error {
 				criticalOverCurrentAlarm, cocaErr := utils.ReadBoolFromFileWithContext(s.cancelCtx, s.criticalOverCurrentAlarmFile)
 				current := float64(rawCurrent) / 1000
 				voltage := float64(rawVoltage) / 1000
-				s.logger.Infof("Voltage: %v, Current: %v, OverCurrentAlarm: %v, CriticalOverCurrentAlarm: %v", voltage, current, overCurrentAlarm, criticalOverCurrentAlarm)
+				s.logger.Debugf("Voltage: %v, Current: %v, OverCurrentAlarm: %v, CriticalOverCurrentAlarm: %v", voltage, current, overCurrentAlarm, criticalOverCurrentAlarm)
 				s.mu.Lock()
 				if vErr == nil {
 					s.voltage = voltage

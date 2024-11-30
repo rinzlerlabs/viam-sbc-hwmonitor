@@ -11,11 +11,11 @@ import (
 	"go.viam.com/rdk/logging"
 )
 
-func TestJetsonPowerSensors(t *testing.T) {
-	Test().RequiresBoardType(boardtype.NVIDIA).ShouldSkip(t)
+func TestRaspberryPiPowerSensors(t *testing.T) {
+	Test().RequiresBoardType(boardtype.RaspberryPi).ShouldSkip(t)
 	logger := logging.NewTestLogger(t)
 	ctx := context.Background()
-	res, err := getJetsonPowerSensors(ctx, logger)
+	res, err := getRaspberryPiPowerSensors(ctx, logger)
 	assert.NoError(t, err)
 	assert.NotNil(t, res)
 	time.Sleep(1 * time.Second)

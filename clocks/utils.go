@@ -32,24 +32,12 @@ func getClockSensors(ctx context.Context, logger logging.Logger) ([]clockSensor,
 	return nil, nil
 }
 
-func getSysFsClock(ctx context.Context, path string) (current, min, max int64, err error) {
-	current, err = readIntFromFile(ctx, filepath.Join(path, "cpufreq/cpuinfo_cur_freq"))
-	if err != nil {
-		return 0, 0, 0, err
-	}
-	min, err = readIntFromFile(ctx, filepath.Join(path, "cpufreq/cpuinfo_min_freq"))
-	if err != nil {
-		return 0, 0, 0, err
-	}
-	max, err = readIntFromFile(ctx, filepath.Join(path, "cpufreq/cpuinfo_max_freq"))
-	if err != nil {
-		return 0, 0, 0, err
-	}
-	return current, min, max, nil
+func getSysFsClock(ctx context.Context, path string) (int64, error) {
+	return readIntFromFile(ctx, path)
 }
 
 func readIntFromFile(ctx context.Context, path string) (int64, error) {
-	ctxWithTimeout, cancel := context.WithTimeout(ctx, 1*time.Millisecond)
+	ctxWithTimeout, cancel := context.WithTimeout(ctx, 10*time.Millisecond)
 	defer cancel()
 	file, err := utils.ReadFileWithContext(ctxWithTimeout, path)
 	if err != nil {

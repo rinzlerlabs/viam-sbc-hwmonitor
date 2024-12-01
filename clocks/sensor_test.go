@@ -45,8 +45,8 @@ func TestNvidiaGetReadings(t *testing.T) {
 		cancelCtx:  ctx,
 		cancelFunc: cancelFunc,
 	}
-	time.Sleep(1 * time.Second)
-	cancelFunc()
+	time.Sleep(2 * time.Second)
+	sensor.Close(ctx)
 	readings, err := sensor.Readings(ctx, nil)
 	assert.NoError(t, err)
 	assert.Equal(t, len(clocks), len(readings))

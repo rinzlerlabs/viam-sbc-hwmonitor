@@ -3,6 +3,7 @@ package clocks
 import (
 	"context"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -80,17 +81,17 @@ func (s *nvidiaClockSensor) StartUpdating() error {
 }
 
 func (s *nvidiaClockSensor) readSysfsClock() (int64, error) {
-	current, min, max, err := getSysFsClock(s.cancelCtx, s.path)
+	current, err := getSysFsClock(s.cancelCtx, s.path)
 	if err != nil {
 		s.logger.Errorw("failed to read sysfs clock", "sensor", s.name, "error", err)
 		return 0, err
 	}
-	s.logger.Debugw("measured clock frequency", "sensor", s.name, "current", current, "min", min, "max", max)
+	s.logger.Debugw("measured clock frequency", "sensor", s.name, "current", current)
 	return current, nil
 }
 
 func newNvidiaCpuClockSensor(ctx context.Context, logger logging.Logger, path string) *nvidiaClockSensor {
-	logger.Debug("Initializing NVIDIA CPU clock sensor")
+	logger.Debugf("Initializing NVIDIA CPU clock sensor: %v", path)
 	cancelCtx, cancelFunc := context.WithCancel(ctx)
 	parts := strings.Split(path, "/")
 	sensorName := parts[len(parts)-1]
@@ -99,7 +100,7 @@ func newNvidiaCpuClockSensor(ctx context.Context, logger logging.Logger, path st
 		name:       sensorName,
 		cancelCtx:  cancelCtx,
 		cancelFunc: cancelFunc,
-		path:       path,
+		path:       filepath.Join(path, "cpufreq/cpuinfo_cur_freq"),
 		sensorType: "sysfs",
 	}
 	return s

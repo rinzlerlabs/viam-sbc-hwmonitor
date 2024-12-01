@@ -97,12 +97,12 @@ func (s *raspberryPiClockSensor) readVcgencmdClock() (int64, error) {
 }
 
 func (s *raspberryPiClockSensor) readSysfsClock() (int64, error) {
-	current, min, max, err := getSysFsClock(s.cancelCtx, s.path)
+	current, err := getSysFsClock(s.cancelCtx, s.path)
 	if err != nil {
 		s.logger.Errorw("failed to read sysfs clock", "sensor", s.name, "error", err)
 		return 0, err
 	}
-	s.logger.Debugw("measured clock frequency", "sensor", s.name, "current", current, "min", min, "max", max)
+	s.logger.Debugw("measured clock frequency", "sensor", s.name, "current", current)
 	return current, nil
 }
 

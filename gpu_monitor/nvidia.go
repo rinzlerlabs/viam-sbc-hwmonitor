@@ -125,7 +125,7 @@ type nvidiaGpuMonitor struct {
 	devices []*nvidiaGpuDevice
 }
 
-func newNvidiaGpuMonitor(ctx context.Context, logger logging.Logger) (GpuMonitor, error) {
+func newNvidiaGpuMonitor(ctx context.Context, logger logging.Logger) (gpuMonitor, error) {
 	devices := make([]*nvidiaGpuDevice, 0)
 	dirs, err := os.ReadDir(frequencyBasePath)
 	if err != nil {

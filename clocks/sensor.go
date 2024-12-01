@@ -25,6 +25,7 @@ type Config struct {
 	logger     logging.Logger
 	cancelCtx  context.Context
 	cancelFunc func()
+	sensors    []clockSensor
 }
 
 func init() {
@@ -56,6 +57,25 @@ func (c *Config) Reconfigure(ctx context.Context, _ resource.Dependencies, conf 
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.logger.Debugf("Reconfiguring %s", PrettyName)
+	if c.cancelFunc != nil {
+		c.cancelFunc()
+	}
+	for _, s := range c.sensors {
+		s.Close()
+	}
+
+	c.cancelCtx, c.cancelFunc = context.WithCancel(context.Background())
+	sensors, err := getClockSensors(c.cancelCtx, c.logger)
+	if err != nil {
+		return err
+	}
+	c.sensors = sensors
+
+	for _, sensor := range c.sensors {
+		if err := sensor.StartUpdating(); err != nil {
+			return err
+		}
+	}
 
 	// In case the module has changed name
 	c.Named = conf.ResourceName().AsNamed()
@@ -66,11 +86,22 @@ func (c *Config) Reconfigure(ctx context.Context, _ resource.Dependencies, conf 
 func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	return getRasPiSystemClocks(ctx)
+	readings := make(map[string]interface{})
+	for _, s := range c.sensors {
+		for k, v := range s.GetReadingMap() {
+			readings[k] = v
+		}
+	}
+	return readings, nil
 }
 
 func (c *Config) Close(ctx context.Context) error {
 	c.logger.Infof("Shutting down %s", PrettyName)
+	c.cancelFunc()
+	for _, s := range c.sensors {
+		s.Close()
+	}
+	c.logger.Infof("Shutdown complete")
 	return nil
 }
 

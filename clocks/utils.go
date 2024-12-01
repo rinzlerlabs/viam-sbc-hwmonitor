@@ -3,7 +3,6 @@ package clocks
 import (
 	"context"
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -11,107 +10,70 @@ import (
 	"time"
 
 	"github.com/rinzlerlabs/sbcidentify"
-	"github.com/rinzlerlabs/sbcidentify/boardtype"
 	"github.com/rinzlerlabs/viam-raspi-sensors/utils"
+	"go.viam.com/rdk/logging"
 )
 
 var (
 	ErrNoGpuClockFound = errors.New("no valid GPU clock path found")
 )
 
-func getSystemClocks(ctx context.Context) (map[string]interface{}, error) {
-	if sbcidentify.IsBoardType(boardtype.RaspberryPi) {
-		return getRasPiSystemClocks(ctx)
-	} else if sbcidentify.IsBoardType(boardtype.NVIDIA) {
-		return getJetsonSystemClocks(ctx)
+func getClockSensors(ctx context.Context, logger logging.Logger) ([]clockSensor, error) {
+	if sbcidentify.IsRaspberryPi() {
+		return getRaspberryPiClockSensors(ctx, logger)
+	} else if sbcidentify.IsNvidia() {
+		return getNvidiaClockSensors(ctx, logger)
 	}
-	return nil, fmt.Errorf("board not supported")
+	boardtype, err := sbcidentify.GetBoardType()
+	if err != nil {
+		logger.Warnf("Failed to get board type: %v", err)
+	}
+	logger.Warnf("No clock sensors found for %s", boardtype)
+	return nil, nil
 }
 
-func getRasPiSystemClocks(ctx context.Context) (map[string]interface{}, error) {
-	cpuClocks, err := getSysDevicesSystemCPUClocks(ctx)
+func getSysFsClock(ctx context.Context, path string) (current, min, max int64, err error) {
+	current, err = readIntFromFile(ctx, filepath.Join(path, "cpufreq/cpuinfo_cur_freq"))
 	if err != nil {
-		return nil, err
+		return 0, 0, 0, err
 	}
-
-	return cpuClocks, nil
+	min, err = readIntFromFile(ctx, filepath.Join(path, "cpufreq/cpuinfo_min_freq"))
+	if err != nil {
+		return 0, 0, 0, err
+	}
+	max, err = readIntFromFile(ctx, filepath.Join(path, "cpufreq/cpuinfo_max_freq"))
+	if err != nil {
+		return 0, 0, 0, err
+	}
+	return current, min, max, nil
 }
 
-func getJetsonSystemClocks(ctx context.Context) (map[string]interface{}, error) {
-	cpuClocks, err := getSysDevicesSystemCPUClocks(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	gpuClock, err := getJetsonGPUClocks(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	cpuClocks["gpu"] = gpuClock
-	return cpuClocks, nil
-}
-
-func getSysDevicesSystemCPUClocks(ctx context.Context) (map[string]interface{}, error) {
-	dirs, err := filepath.Glob("/sys/devices/system/cpu/cpu[0-9]*")
-	if err != nil {
-		return nil, err
-	}
-
-	clockFrequencies := make(map[string]interface{})
-	for _, dir := range dirs {
-		cpu := filepath.Base(dir)
-		clockFrequencies[cpu], err = readIntFromFile(ctx, filepath.Join(dir, "cpufreq/cpuinfo_cur_freq"))
-		if err != nil {
-			return nil, err
-		}
-		clockFrequencies[cpu+"_min"], err = readIntFromFile(ctx, filepath.Join(dir, "cpufreq/cpuinfo_min_freq"))
-		if err != nil {
-			return nil, err
-		}
-		clockFrequencies[cpu+"_max"], err = readIntFromFile(ctx, filepath.Join(dir, "cpufreq/cpuinfo_max_freq"))
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return clockFrequencies, nil
-}
-
-func readIntFromFile(ctx context.Context, path string) (int, error) {
+func readIntFromFile(ctx context.Context, path string) (int64, error) {
 	ctxWithTimeout, cancel := context.WithTimeout(ctx, 1*time.Millisecond)
 	defer cancel()
 	file, err := utils.ReadFileWithContext(ctxWithTimeout, path)
 	if err != nil {
 		return 0, err
 	}
-	i, err := strconv.Atoi(strings.TrimSpace(string(file)))
+	i, err := strconv.ParseInt(strings.TrimSpace(string(file)), 10, 64)
 	if err != nil {
 		return 0, err
 	}
 	return i, nil
 }
 
-func getJetsonGPUClocks(ctx context.Context) (int, error) {
-	paths := []string{
-		"/sys/devices/platform/bus@0/17000000.gpu/devfreq/17000000.gpu/cur_freq",
-		"/sys/devices/platform/17000000.ga10b/devfreq/17000000.ga10b/cur_freq",
+func getSysFsCpuPaths() ([]string, error) {
+	paths, err := filepath.Glob("/sys/devices/system/cpu/cpu[0-9]*")
+	if err != nil {
+		return nil, err
 	}
-
+	validPaths := make([]string, 0)
 	for _, path := range paths {
 		if _, err := os.Stat(path); os.IsNotExist(err) {
 			continue
 		}
-		clock, err := utils.ReadFileWithContext(ctx, path)
-		if err != nil {
-			return 0, err
-		}
-		clockInt, err := strconv.Atoi(strings.TrimSpace(string(clock)))
-		if err != nil {
-			return 0, err
-		}
-		return clockInt, nil
+		validPaths = append(validPaths, path)
 	}
 
-	return 0, ErrNoGpuClockFound
+	return validPaths, nil
 }

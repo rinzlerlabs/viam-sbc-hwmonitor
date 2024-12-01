@@ -13,12 +13,12 @@ var (
 	ErrUnsupportedBoard = errors.New("gpu stats not supported on this board")
 )
 
-type GpuMonitor interface {
+type gpuMonitor interface {
 	GetGPUStats(ctx context.Context) ([]gpuDeviceStats, error)
 	Close()
 }
 
-func newGpuMonitor(ctx context.Context, logger logging.Logger) (GpuMonitor, error) {
+func newGpuMonitor(ctx context.Context, logger logging.Logger) (gpuMonitor, error) {
 	if sbcidentify.IsBoardType(boardtype.NVIDIA) {
 		return newNvidiaGpuMonitor(ctx, logger)
 	}

@@ -5,7 +5,7 @@ import (
 	"math"
 	"sync"
 
-	"github.com/shirou/gopsutil/mem"
+	"github.com/shirou/gopsutil/v4/mem"
 	"go.viam.com/rdk/components/sensor"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
@@ -82,6 +82,17 @@ func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (ma
 	if err != nil {
 		return nil, err
 	}
+
+	swap, err := mem.SwapMemoryWithContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	swap_devices, err := mem.SwapDevicesWithContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	ret["total_memory"] = v.Total
 	ret["available_memory"] = v.Available
 	ret["used_memory"] = v.Used
@@ -92,10 +103,50 @@ func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (ma
 	ret["wired_memory"] = v.Wired
 	ret["buffers_memory"] = v.Buffers
 	ret["cached_memory"] = v.Cached
-	ret["swap_total"] = v.SwapTotal
-	ret["swap_free"] = v.SwapFree
+	ret["writeback"] = v.WriteBack
 	ret["dirty"] = v.Dirty
-	ret["writeback"] = v.Writeback
+	ret["writebacktmp"] = v.WriteBackTmp
+	ret["shared"] = v.Shared
+	ret["slab"] = v.Slab
+	ret["sreclaimable"] = v.Sreclaimable
+	ret["sunreclaim"] = v.Sunreclaim
+	ret["pagetables"] = v.PageTables
+	ret["swapcached"] = v.SwapCached
+	ret["commitlimit"] = v.CommitLimit
+	ret["committed_as"] = v.CommittedAS
+	ret["high_total"] = v.HighTotal
+	ret["high_free"] = v.HighFree
+	ret["low_total"] = v.LowTotal
+	ret["low_free"] = v.LowFree
+	ret["mapped"] = v.Mapped
+	ret["vmalloc_total"] = v.VmallocTotal
+	ret["vmalloc_used"] = v.VmallocUsed
+	ret["vmalloc_chunk"] = v.VmallocChunk
+	ret["hugepages_total"] = v.HugePagesTotal
+	ret["hugepages_free"] = v.HugePagesFree
+	ret["hugepages_rsvd"] = v.HugePagesRsvd
+	ret["hugepages_surp"] = v.HugePagesSurp
+	ret["hugepages_size"] = v.HugePageSize
+	ret["anonhugepages"] = v.AnonHugePages
+
+	ret["swap_total"] = swap.Total
+	ret["swap_used"] = swap.Used
+	ret["swap_free"] = swap.Free
+	ret["swap_used_percent"] = math.Round(swap.UsedPercent*100) / 100
+	ret["swap_s_in"] = swap.Sin
+	ret["swap_s_out"] = swap.Sout
+	ret["swap_page_in"] = swap.PgIn
+	ret["swap_page_out"] = swap.PgOut
+	ret["swap_page_fault"] = swap.PgFault
+	ret["swap_page_maj_fault"] = swap.PgMajFault
+
+	for _, device := range swap_devices {
+		total_swap := device.UsedBytes + device.FreeBytes
+		ret["swap_device_"+device.Name+"_used"] = device.UsedBytes
+		ret["swap_device_"+device.Name+"_free"] = device.FreeBytes
+		ret["swap_device_"+device.Name+"_total"] = total_swap
+		ret["swap_device_"+device.Name+"_used_percent"] = math.Round((float64(device.UsedBytes)/float64(total_swap))*100) / 100
+	}
 
 	return ret, nil
 }

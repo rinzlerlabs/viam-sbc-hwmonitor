@@ -8,7 +8,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/shirou/gopsutil/process"
+	"github.com/shirou/gopsutil/v4/process"
 	"go.viam.com/rdk/components/sensor"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
@@ -41,6 +41,7 @@ type processConfig struct {
 	IncludeCwd       bool
 	IncludeOpenFiles bool
 	IncludeUlimits   bool
+	IncludeNetStats  bool
 }
 
 func init() {
@@ -86,6 +87,7 @@ func (c *Config) Reconfigure(ctx context.Context, _ resource.Dependencies, conf 
 		IncludeCwd:       newConf.IncludeCwd,
 		IncludeOpenFiles: newConf.IncludeOpenFiles,
 		IncludeUlimits:   newConf.IncludeUlimits,
+		IncludeNetStats:  newConf.IncludeNetStats,
 	}
 
 	// In case the module has changed name
@@ -140,8 +142,11 @@ func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (ma
 		} else {
 			ret["rss"] = mem.RSS
 			ret["vms"] = mem.VMS
-			ret["swap"] = mem.Swap
+			ret["hwm"] = mem.HWM
+			ret["data"] = mem.Data
+			ret["stack"] = mem.Stack
 			ret["locked"] = mem.Locked
+			ret["swap"] = mem.Swap
 		}
 		numThreads, err := proc.NumThreadsWithContext(ctx)
 		if err != nil {
@@ -206,6 +211,22 @@ func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (ma
 					ret[fmt.Sprintf("rlimit_%s_hard", resourceToString(v.Resource))] = v.Hard
 					ret[fmt.Sprintf("rlimit_%s_soft", resourceToString(v.Resource))] = v.Soft
 					ret[fmt.Sprintf("rlimit_%s_used", resourceToString(v.Resource))] = v.Used
+				}
+			}
+		}
+
+		if c.process.IncludeNetStats {
+			netstats, err := proc.ConnectionsWithContext(ctx)
+			if err != nil {
+				c.logger.Warnf("Error getting process net stats: %v", err)
+			} else {
+				ret["netstat_count"] = len(netstats)
+				for i, ns := range netstats {
+					ret[fmt.Sprintf("netstat_%d_family", i)] = ns.Family
+					ret[fmt.Sprintf("netstat_%d_type", i)] = ns.Type
+					ret[fmt.Sprintf("netstat_%d_laddr", i)] = ns.Laddr
+					ret[fmt.Sprintf("netstat_%d_raddr", i)] = ns.Raddr
+					ret[fmt.Sprintf("netstat_%d_status", i)] = ns.Status
 				}
 			}
 		}

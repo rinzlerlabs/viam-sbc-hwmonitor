@@ -18,7 +18,11 @@ func TestRaspberryPiPowerSensors(t *testing.T) {
 	res, err := getRaspberryPiPowerSensors(ctx, logger)
 	assert.NoError(t, err)
 	assert.NotNil(t, res)
-	time.Sleep(1 * time.Second)
+	for _, s := range res {
+		assert.NotNil(t, s)
+		assert.NoError(t, s.StartUpdating())
+	}
+	time.Sleep(2 * time.Second)
 	for _, s := range res {
 		assert.NotNil(t, s)
 		logger.Infof("s: %v", s.GetReadingMap())

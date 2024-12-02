@@ -10,8 +10,9 @@ import (
 	"time"
 
 	"github.com/rinzlerlabs/sbcidentify"
-	"github.com/rinzlerlabs/viam-raspi-sensors/utils"
 	"go.viam.com/rdk/logging"
+
+	"github.com/rinzlerlabs/viam-raspi-sensors/utils"
 )
 
 var (

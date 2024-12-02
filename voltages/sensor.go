@@ -75,6 +75,12 @@ func (c *Config) Reconfigure(ctx context.Context, _ resource.Dependencies, conf 
 	}
 	c.sensors = sensors
 
+	for _, sensor := range c.sensors {
+		if err := sensor.StartUpdating(); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 

@@ -60,8 +60,10 @@ func (c *Config) Reconfigure(ctx context.Context, _ resource.Dependencies, conf 
 	if c.cancelFunc != nil {
 		c.cancelFunc()
 	}
-	for _, s := range c.sensors {
-		s.Close()
+	if c.sensors != nil {
+		for _, s := range c.sensors {
+			s.Close()
+		}
 	}
 
 	c.cancelCtx, c.cancelFunc = context.WithCancel(context.Background())

@@ -1,0 +1,13 @@
+NOTICE
+
+This project includes software developed by Rinzler Labs.
+Copyright (c) Rinzler Labs / TheGreatCO, 2024
+
+This software makes use of third-party libraries that may have different licenses.
+---------------------------------------------------
+github.com/shirou/gopsutil/v4 v4.24.11
+Licensed under: BSD 3-Clause License
+Copyright (c) WAKAYAMA Shirou, 2014
+---------------------------------------------------
+
+The respective licenses are included in this distribution and must be complied with in accordance with their terms.

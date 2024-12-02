@@ -2,6 +2,7 @@ package process_monitor
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"os"
 	"strings"
@@ -39,6 +40,7 @@ type processConfig struct {
 	IncludeCmdline   bool
 	IncludeCwd       bool
 	IncludeOpenFiles bool
+	IncludeUlimits   bool
 }
 
 func init() {
@@ -83,6 +85,7 @@ func (c *Config) Reconfigure(ctx context.Context, _ resource.Dependencies, conf 
 		IncludeCmdline:   newConf.IncludeCmdline,
 		IncludeCwd:       newConf.IncludeCwd,
 		IncludeOpenFiles: newConf.IncludeOpenFiles,
+		IncludeUlimits:   newConf.IncludeUlimits,
 	}
 
 	// In case the module has changed name
@@ -140,6 +143,20 @@ func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (ma
 			ret["swap"] = mem.Swap
 			ret["locked"] = mem.Locked
 		}
+		numThreads, err := proc.NumThreadsWithContext(ctx)
+		if err != nil {
+			c.logger.Warnf("Error getting process threads: %v", err)
+		} else {
+			ret["threads"] = numThreads
+		}
+
+		numOpenFiles, err := proc.NumFDsWithContext(ctx)
+		if err != nil {
+			c.logger.Warnf("Error getting process open files: %v", err)
+		} else {
+			ret["open_files"] = numOpenFiles
+		}
+
 		if c.process.IncludeEnv {
 			env, err := proc.EnvironWithContext(ctx)
 			if err != nil {
@@ -174,13 +191,66 @@ func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (ma
 			if err != nil {
 				c.logger.Warnf("Error getting process open files: %v", err)
 			} else {
-				ret["open_files"] = len(openFiles)
+				for i, f := range openFiles {
+					ret[fmt.Sprintf("open_file_%d", i)] = f.Path
+				}
 			}
 		}
 
+		if c.process.IncludeUlimits {
+			limits, err := proc.RlimitWithContext(ctx)
+			if err != nil {
+				c.logger.Warnf("Error getting process rlimits: %v", err)
+			} else {
+				for _, v := range limits {
+					ret[fmt.Sprintf("rlimit_%s_hard", resourceToString(v.Resource))] = v.Hard
+					ret[fmt.Sprintf("rlimit_%s_soft", resourceToString(v.Resource))] = v.Soft
+					ret[fmt.Sprintf("rlimit_%s_used", resourceToString(v.Resource))] = v.Used
+				}
+			}
+		}
 	}
 
 	return ret, nil
+}
+
+func resourceToString(r int32) string {
+	switch r {
+	case process.RLIMIT_AS:
+		return "as"
+	case process.RLIMIT_CORE:
+		return "core"
+	case process.RLIMIT_CPU:
+		return "cpu"
+	case process.RLIMIT_DATA:
+		return "data"
+	case process.RLIMIT_FSIZE:
+		return "fsize"
+	case process.RLIMIT_LOCKS:
+		return "locks"
+	case process.RLIMIT_MEMLOCK:
+		return "memlock"
+	case process.RLIMIT_MSGQUEUE:
+		return "msgqueue"
+	case process.RLIMIT_NICE:
+		return "nice"
+	case process.RLIMIT_NOFILE:
+		return "nofile"
+	case process.RLIMIT_NPROC:
+		return "nproc"
+	case process.RLIMIT_RSS:
+		return "rss"
+	case process.RLIMIT_RTPRIO:
+		return "rtprio"
+	case process.RLIMIT_RTTIME:
+		return "rttime"
+	case process.RLIMIT_SIGPENDING:
+		return "sigpending"
+	case process.RLIMIT_STACK:
+		return "stack"
+	default:
+		return fmt.Sprintf("unknown_%d", r)
+	}
 }
 
 func (c *Config) Close(ctx context.Context) error {

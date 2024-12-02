@@ -16,7 +16,7 @@ func TestGetProcessInfo(t *testing.T) {
 	ctx := context.Background()
 	sensor := &Config{
 		logger:  logger,
-		process: &processConfig{Name: "viam-agent", IncludeEnv: true, IncludeCmdline: true, IncludeCwd: true, IncludeOpenFiles: true},
+		process: &processConfig{Name: "viam-agent", IncludeEnv: true, IncludeCmdline: true, IncludeCwd: true, IncludeOpenFiles: true, IncludeUlimits: true},
 	}
 	now := time.Now()
 	readings, err := sensor.Readings(ctx, nil)
@@ -25,5 +25,5 @@ func TestGetProcessInfo(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, readings)
 	assert.NotEmpty(t, readings)
-	logger.Infof("Memory readings: %v", readings)
+	logger.Infof("Proc readings: %v", readings)
 }

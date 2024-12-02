@@ -13,6 +13,7 @@ type ComponentConfig struct {
 	IncludeCmdline   bool   `json:"include_cmdline"`
 	IncludeCwd       bool   `json:"include_cwd"`
 	IncludeOpenFiles bool   `json:"include_open_files"`
+	IncludeUlimits   bool   `json:"include_ulimits"`
 }
 
 func (conf *ComponentConfig) Validate(path string) ([]string, error) {

@@ -104,7 +104,7 @@ func (s *raspberryPiClockSensor) readVcgencmdClock() (int64, error) {
 		s.logger.Errorw("failed to parse frequency", "sensor", s.name, "output", outputStr, "error", err)
 		return 0, err
 	}
-	s.logger.Infow("measured clock frequency", "sensor", s.name, "frequency", frequency)
+	s.logger.Debugf("measured clock frequency", "sensor", s.name, "frequency", frequency)
 	return frequency, nil
 }
 

@@ -43,6 +43,10 @@
     {
       "api": "rdk:component:sensor",
       "model": "rinzlerlabs:hwmonitor:process_monitor"
+    },
+    {
+      "api":"rdk:component:sensor",
+      "model": "rinzlerlabs:hwmonitor:disk_monitor"
     }
   ],
   "build": {

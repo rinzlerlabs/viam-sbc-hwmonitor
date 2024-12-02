@@ -8,6 +8,7 @@ import (
 	"github.com/rinzlerlabs/viam-raspi-sensors/clocks"
 	"github.com/rinzlerlabs/viam-raspi-sensors/cpu_manager"
 	"github.com/rinzlerlabs/viam-raspi-sensors/cpu_monitor"
+	"github.com/rinzlerlabs/viam-raspi-sensors/disk_monitor"
 	"github.com/rinzlerlabs/viam-raspi-sensors/gpu_monitor"
 	"github.com/rinzlerlabs/viam-raspi-sensors/memory_monitor"
 	"github.com/rinzlerlabs/viam-raspi-sensors/process_monitor"
@@ -31,5 +32,6 @@ func main() {
 	moduleutils.AddModularResource(gpu_monitor.API, gpu_monitor.Model)
 	moduleutils.AddModularResource(memory_monitor.API, memory_monitor.Model)
 	moduleutils.AddModularResource(process_monitor.API, process_monitor.Model)
+	moduleutils.AddModularResource(disk_monitor.API, disk_monitor.Model)
 	utils.ContextualMain(moduleutils.RunModule, logger)
 }

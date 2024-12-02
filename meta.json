@@ -35,6 +35,14 @@
     {
       "api": "rdk:component:sensor",
       "model": "rinzlerlabs:hwmonitor:gpu_monitor"
+    },
+    {
+      "api": "rdk:component:sensor",
+      "model": "rinzlerlabs:hwmonitor:memory_monitor"
+    },
+    {
+      "api": "rdk:component:sensor",
+      "model": "rinzlerlabs:hwmonitor:process_monitor"
     }
   ],
   "build": {

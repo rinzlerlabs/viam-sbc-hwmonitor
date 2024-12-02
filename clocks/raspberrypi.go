@@ -9,11 +9,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/rinzlerlabs/sbcidentify"
+	"github.com/rinzlerlabs/sbcidentify/boardtype"
 	"go.viam.com/rdk/logging"
 )
 
 var (
-	raspiClocks = []string{
+	raspi4Clocks = []string{
 		"arm",
 		"core",
 		"h264",
@@ -26,6 +28,16 @@ var (
 		"vec",
 		"hdmi",
 		"dpi",
+	}
+
+	raspi5Clocks = []string{
+		"arm",
+		"core",
+		"emmc",
+		"hdmi",
+		"isp",
+		"uart",
+		"v3d",
 	}
 )
 
@@ -123,6 +135,24 @@ func (s *raspberryPiClockSensor) GetName() string {
 	return s.name
 }
 
+func getRaspberryPi4ClockSensors(ctx context.Context, logger logging.Logger) []clockSensor {
+	sensors := make([]clockSensor, 0)
+	for _, name := range raspi4Clocks {
+		sensor := newRaspberryPiVcgencmdSensor(ctx, logger, name)
+		sensors = append(sensors, sensor)
+	}
+	return sensors
+}
+
+func getRaspberryPi5ClockSensors(ctx context.Context, logger logging.Logger) []clockSensor {
+	sensors := make([]clockSensor, 0)
+	for _, name := range raspi5Clocks {
+		sensor := newRaspberryPiVcgencmdSensor(ctx, logger, name)
+		sensors = append(sensors, sensor)
+	}
+	return sensors
+}
+
 func newRaspberryPiVcgencmdSensor(ctx context.Context, logger logging.Logger, name string) *raspberryPiClockSensor {
 	cancelCtx, cancelFunc := context.WithCancel(ctx)
 	return &raspberryPiClockSensor{
@@ -150,9 +180,13 @@ func newRaspberryPiSysFsSensor(ctx context.Context, logger logging.Logger, path 
 
 func getRaspberryPiClockSensors(ctx context.Context, logger logging.Logger) ([]clockSensor, error) {
 	sensors := make([]clockSensor, 0)
-	for _, name := range raspiClocks {
-		sensor := newRaspberryPiVcgencmdSensor(ctx, logger, name)
-		sensors = append(sensors, sensor)
+	if sbcidentify.IsBoardType(boardtype.RaspberryPi5) {
+		sensors = append(sensors, getRaspberryPi5ClockSensors(ctx, logger)...)
+	} else if sbcidentify.IsBoardType(boardtype.RaspberryPi4) {
+		sensors = append(sensors, getRaspberryPi4ClockSensors(ctx, logger)...)
+	} else {
+		b, e := sbcidentify.GetBoardType()
+		logger.Warnf("No vcgencmd clock sensors found for %s %s", b, e)
 	}
 	sysFsCpus, err := getSysFsCpuPaths()
 	if err != nil {

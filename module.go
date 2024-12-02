@@ -1,6 +1,7 @@
 package main
 
 import (
+	moduleutils "github.com/thegreatco/viamutils/module"
 	"go.viam.com/rdk/module"
 	"go.viam.com/utils"
 
@@ -8,13 +9,13 @@ import (
 	"github.com/rinzlerlabs/viam-raspi-sensors/cpu_manager"
 	"github.com/rinzlerlabs/viam-raspi-sensors/cpu_monitor"
 	"github.com/rinzlerlabs/viam-raspi-sensors/gpu_monitor"
+	"github.com/rinzlerlabs/viam-raspi-sensors/memory_monitor"
+	"github.com/rinzlerlabs/viam-raspi-sensors/process_monitor"
 	"github.com/rinzlerlabs/viam-raspi-sensors/pwm_fan"
 	"github.com/rinzlerlabs/viam-raspi-sensors/temperatures"
 	"github.com/rinzlerlabs/viam-raspi-sensors/throttling"
-	"github.com/rinzlerlabs/viam-raspi-sensors/voltages"
-
 	raspiutils "github.com/rinzlerlabs/viam-raspi-sensors/utils"
-	moduleutils "github.com/thegreatco/viamutils/module"
+	"github.com/rinzlerlabs/viam-raspi-sensors/voltages"
 )
 
 func main() {
@@ -28,5 +29,7 @@ func main() {
 	moduleutils.AddModularResource(pwm_fan.API, pwm_fan.Model)
 	moduleutils.AddModularResource(cpu_monitor.API, cpu_monitor.Model)
 	moduleutils.AddModularResource(gpu_monitor.API, gpu_monitor.Model)
+	moduleutils.AddModularResource(memory_monitor.API, memory_monitor.Model)
+	moduleutils.AddModularResource(process_monitor.API, process_monitor.Model)
 	utils.ContextualMain(moduleutils.RunModule, logger)
 }

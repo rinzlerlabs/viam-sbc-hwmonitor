@@ -2,6 +2,7 @@ package disk_monitor
 
 import (
 	"context"
+	"math"
 	"path/filepath"
 	"sync"
 
@@ -119,7 +120,7 @@ func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (ma
 		ret[name+"_total"] = usage.Total
 		ret[name+"_used"] = usage.Used
 		ret[name+"_free"] = usage.Free
-		ret[name+"_used_percent"] = usage.UsedPercent
+		ret[name+"_used_percent"] = math.Round(usage.UsedPercent*100) / 100
 	}
 
 	return ret, nil

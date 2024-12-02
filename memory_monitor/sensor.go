@@ -94,6 +94,8 @@ func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (ma
 	ret["cached_memory"] = v.Cached
 	ret["swap_total"] = v.SwapTotal
 	ret["swap_free"] = v.SwapFree
+	ret["dirty"] = v.Dirty
+	ret["writeback"] = v.Writeback
 
 	return ret, nil
 }

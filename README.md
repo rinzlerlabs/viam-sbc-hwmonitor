@@ -37,7 +37,10 @@ Sample Config
   "include_env": <true|false>,
   "include_cmdline": <true|false>,
   "include_ulimits": <true|false>,
-  "include_cwd": <true|false>
+  "include_cwd": <true|false>,
+  "include_net_stats": <true|false>,
+  "include_open_file_count": <true|false>,
+  "include_mem_info": <true|false>
 }
 ```
 

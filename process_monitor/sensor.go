@@ -34,14 +34,16 @@ type Config struct {
 }
 
 type processConfig struct {
-	Name             string
-	ExecutablePath   string
-	IncludeEnv       bool
-	IncludeCmdline   bool
-	IncludeCwd       bool
-	IncludeOpenFiles bool
-	IncludeUlimits   bool
-	IncludeNetStats  bool
+	Name                 string
+	ExecutablePath       string
+	IncludeEnv           bool
+	IncludeCmdline       bool
+	IncludeCwd           bool
+	IncludeOpenFiles     bool
+	IncludeUlimits       bool
+	IncludeNetStats      bool
+	IncludeMemInfo       bool
+	IncludeOpenFileCount bool
 }
 
 func init() {
@@ -80,14 +82,16 @@ func (c *Config) Reconfigure(ctx context.Context, _ resource.Dependencies, conf 
 	}
 
 	c.process = &processConfig{
-		Name:             newConf.Name,
-		ExecutablePath:   newConf.ExecutablePath,
-		IncludeEnv:       newConf.IncludeEnv,
-		IncludeCmdline:   newConf.IncludeCmdline,
-		IncludeCwd:       newConf.IncludeCwd,
-		IncludeOpenFiles: newConf.IncludeOpenFiles,
-		IncludeUlimits:   newConf.IncludeUlimits,
-		IncludeNetStats:  newConf.IncludeNetStats,
+		Name:                 newConf.Name,
+		ExecutablePath:       newConf.ExecutablePath,
+		IncludeEnv:           newConf.IncludeEnv,
+		IncludeCmdline:       newConf.IncludeCmdline,
+		IncludeCwd:           newConf.IncludeCwd,
+		IncludeOpenFileCount: newConf.IncludeOpenFileCount,
+		IncludeOpenFiles:     newConf.IncludeOpenFiles,
+		IncludeUlimits:       newConf.IncludeUlimits,
+		IncludeNetStats:      newConf.IncludeNetStats,
+		IncludeMemInfo:       newConf.IncludeMemInfo,
 	}
 
 	// In case the module has changed name
@@ -136,18 +140,7 @@ func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (ma
 		} else {
 			ret["cpu"] = math.Round(cpu*100) / 100
 		}
-		mem, err := proc.MemoryInfoWithContext(ctx)
-		if err != nil {
-			c.logger.Warnf("Error getting process memory: %v", err)
-		} else {
-			ret["rss"] = mem.RSS
-			ret["vms"] = mem.VMS
-			ret["hwm"] = mem.HWM
-			ret["data"] = mem.Data
-			ret["stack"] = mem.Stack
-			ret["locked"] = mem.Locked
-			ret["swap"] = mem.Swap
-		}
+
 		numThreads, err := proc.NumThreadsWithContext(ctx)
 		if err != nil {
 			c.logger.Warnf("Error getting process threads: %v", err)
@@ -155,11 +148,28 @@ func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (ma
 			ret["threads"] = numThreads
 		}
 
-		numOpenFiles, err := proc.NumFDsWithContext(ctx)
-		if err != nil {
-			c.logger.Warnf("Error getting process open files: %v", err)
-		} else {
-			ret["open_files"] = numOpenFiles
+		if c.process.IncludeMemInfo {
+			mem, err := proc.MemoryInfoWithContext(ctx)
+			if err != nil {
+				c.logger.Warnf("Error getting process memory: %v", err)
+			} else {
+				ret["rss"] = mem.RSS
+				ret["vms"] = mem.VMS
+				ret["hwm"] = mem.HWM
+				ret["data"] = mem.Data
+				ret["stack"] = mem.Stack
+				ret["locked"] = mem.Locked
+				ret["swap"] = mem.Swap
+			}
+		}
+
+		if c.process.IncludeOpenFileCount {
+			numOpenFiles, err := proc.NumFDsWithContext(ctx)
+			if err != nil {
+				c.logger.Warnf("Error getting process open files: %v", err)
+			} else {
+				ret["open_files"] = numOpenFiles
+			}
 		}
 
 		if c.process.IncludeEnv {

@@ -10,21 +10,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rinzlerlabs/viam-raspi-sensors/utils"
 	"go.viam.com/rdk/logging"
+
+	"github.com/rinzlerlabs/viam-raspi-sensors/utils"
 )
 
 var (
 	ErrIgnoredSensor = errors.New("ignored sensor")
 )
-
-type powerSensor interface {
-	StartUpdating() error
-	Close()
-	GetReading() (voltage, current, power float64)
-	GetReadingMap() map[string]interface{}
-	GetName() string
-}
 
 type jetsonPowerSensor struct {
 	logger                       logging.Logger

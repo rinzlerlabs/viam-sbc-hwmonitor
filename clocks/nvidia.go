@@ -11,13 +11,6 @@ import (
 	"go.viam.com/rdk/logging"
 )
 
-type clockSensor interface {
-	StartUpdating() error
-	Close()
-	GetReadingMap() map[string]interface{}
-	GetName() string
-}
-
 type nvidiaClockSensor struct {
 	logger     logging.Logger
 	mu         sync.RWMutex

@@ -15,17 +15,51 @@ func TestRaspberryPiPowerSensors(t *testing.T) {
 	Test().RequiresBoardType(boardtype.RaspberryPi).ShouldSkip(t)
 	logger := logging.NewTestLogger(t)
 	ctx := context.Background()
-	res, err := getRaspberryPiPowerSensors(ctx, logger)
+	sensors, err := getRaspberryPiPowerSensors(ctx, logger)
 	assert.NoError(t, err)
-	assert.NotNil(t, res)
-	for _, s := range res {
+	assert.NotNil(t, sensors)
+	for _, s := range sensors {
 		assert.NotNil(t, s)
 		assert.NoError(t, s.StartUpdating())
 	}
-	time.Sleep(2 * time.Second)
-	for _, s := range res {
+	waitForValues(t, sensors)
+	for _, s := range sensors {
 		assert.NotNil(t, s)
-		logger.Infof("s: %v", s.GetReadingMap())
+		m := s.GetReadingMap()
+		assert.NotNil(t, m)
+		for k, v := range m {
+			logger.Infof("%s: %v", k, v)
+			assert.NotEmpty(t, k)
+			assert.NotZero(t, v)
+		}
 		defer s.Close()
+	}
+}
+
+func waitForValues(t *testing.T, sensors []powerSensor) {
+	timeout := time.Now().Add(10 * time.Second)
+	for {
+		if time.Now().After(timeout) {
+			t.Fatal("Timed out waiting for sensors to have values")
+		}
+		allHaveValues := true
+		for _, s := range sensors {
+			m := s.GetReadingMap()
+			if len(m) == 0 {
+				allHaveValues = false
+			}
+			for _, v := range m {
+				f, success := v.(float64)
+				if !success {
+					allHaveValues = false
+				}
+				if f == 0 {
+					allHaveValues = false
+				}
+			}
+		}
+		if allHaveValues {
+			break
+		}
 	}
 }

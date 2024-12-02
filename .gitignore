@@ -22,3 +22,5 @@ go.work
 
 bin/
 viam-raspi-sensors.tar.gz
+gopsutil_LICENSE
+*.tar.gz

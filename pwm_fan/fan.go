@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/rinzlerlabs/sbcidentify"
+	"github.com/rinzlerlabs/sbcidentify/boardtype"
 	"go.viam.com/rdk/components/board"
 	"go.viam.com/rdk/resource"
 )
@@ -19,6 +21,9 @@ type fan struct {
 
 func newFan(deps resource.Dependencies, boardName string, pin string, useInternalFan bool) (*fan, error) {
 	if useInternalFan {
+		if !sbcidentify.IsBoardType(boardtype.RaspberryPi5B) {
+			return nil, fmt.Errorf("internal fan is only supported on Raspberry Pi 5")
+		}
 		matches, err := filepath.Glob("/sys/class/hwmon/hwmon*/pwm1")
 		if err != nil {
 			return nil, err

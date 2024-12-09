@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"sync"
 
+	"github.com/rinzlerlabs/sbcidentify"
 	"go.viam.com/rdk/components/sensor"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
@@ -68,14 +69,19 @@ func (c *Config) Reconfigure(ctx context.Context, _ resource.Dependencies, conf 
 		return err
 	}
 
+	// In case the module has changed name
+	c.Named = conf.ResourceName().AsNamed()
+	if !sbcidentify.IsRaspberryPi() {
+		c.logger.Errorf("This sensor is only supported on Raspberry Pi")
+		return utils.ErrBoardNotSupported
+	}
+
 	err = utils.InstallPackage("cpufrequtils")
 	if err != nil {
 		c.logger.Errorf("Error installing cpufrequtils: %s", err)
 		return err
 	}
 
-	// In case the module has changed name
-	c.Named = conf.ResourceName().AsNamed()
 	c.Governor = newConf.Governor
 	c.Frequency = newConf.Frequency
 	c.Minimum = newConf.Minimum

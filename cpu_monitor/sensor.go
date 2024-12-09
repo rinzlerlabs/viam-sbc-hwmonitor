@@ -67,8 +67,11 @@ func (c *Config) Reconfigure(ctx context.Context, _ resource.Dependencies, conf 
 	if c.cancelFunc != nil {
 		c.cancelFunc()
 	}
-	c.logger.Infof("Waiting for background task to stop")
+	c.logger.Debugf("Waiting for background task to stop")
 	c.wg.Wait()
+
+	// Reset stats
+	c.stats = make(map[string]interface{})
 
 	c.cancelCtx, c.cancelFunc = context.WithCancel(context.Background())
 
@@ -77,7 +80,7 @@ func (c *Config) Reconfigure(ctx context.Context, _ resource.Dependencies, conf 
 		return err
 	}
 
-	// In case the module has changed name
+	// In case the component has changed name
 	c.Named = conf.ResourceName().AsNamed()
 	c.sleepTime = 1 * time.Second
 	if newConf.SleepTimeMs > 0 {
@@ -85,7 +88,7 @@ func (c *Config) Reconfigure(ctx context.Context, _ resource.Dependencies, conf 
 	}
 	c.task = c.captureCPUStats
 	go c.task()
-	c.logger.Debugf("reconfigure complete %s", PrettyName)
+	c.logger.Debugf("Reconfigure complete %s", PrettyName)
 	return nil
 }
 
@@ -112,12 +115,19 @@ func (c *Config) Ready(ctx context.Context, extra map[string]interface{}) (bool,
 func (c *Config) captureCPUStats() {
 	c.wg.Add(1)
 	defer c.wg.Done()
-	lastStats, err := readCPUStats()
+
+	c.logger.Debug("starting CPU stats loop")
+	defer c.logger.Debug("CPU stats loop stopped")
+
+	var lastStats map[string]CPUCoreStats
+	var err error
+	backoff := 1 * time.Second
+	lastStats, err = readCPUStats()
 	if err != nil {
-		c.logger.Errorf("Failed to read CPU stats: %v", err)
-		panic(err)
+		c.logger.Errorf("Failed to read CPU stats, will retry in %v: %v", backoff, err)
+		return
 	}
-	c.logger.Debug("starting CPU stats main loop")
+
 	for {
 		select {
 		case <-c.cancelCtx.Done():

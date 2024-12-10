@@ -119,12 +119,9 @@ func (c *Config) captureCPUStats() {
 	c.logger.Debug("starting CPU stats loop")
 	defer c.logger.Debug("CPU stats loop stopped")
 
-	var lastStats map[string]CPUCoreStats
-	var err error
-	backoff := 1 * time.Second
-	lastStats, err = readCPUStats()
+	lastStats, err := readCPUStats()
 	if err != nil {
-		c.logger.Errorf("Failed to read CPU stats, will retry in %v: %v", backoff, err)
+		c.logger.Errorf("Failed to read CPU stats: %v", err)
 		return
 	}
 
@@ -149,6 +146,7 @@ func (c *Config) captureCPUStats() {
 				newStats[core] = usage
 			}
 			c.stats = newStats
+			lastStats = currStats
 		}
 	}
 }

@@ -64,7 +64,7 @@ func TestGetDiskInfo(t *testing.T) {
 }
 
 func TestGetDisksFromConfig(t *testing.T) {
-	Test().ShouldSkip(t)
+	Test().RequiresSbc().ShouldSkip(t)
 	tests := []struct {
 		name           string
 		disks          []string

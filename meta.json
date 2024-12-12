@@ -1,7 +1,7 @@
 {
   "module_id": "rinzlerlabs:sbc-hwmonitor",
   "visibility": "public",
-  "url": "https://github.com/rinzlerlabs/viam-raspi-sensors",
+  "url": "https://github.com/rinzlerlabs/viam-sbc-hwmonitor",
   "description": "A collection of sensors and utilities for single board computers (SBC) like the Raspberry Pi or NVIDIA Jetson Nano. The values in Readings should not be considered stable at this time. This module is under active development.",
   "models": [
     {

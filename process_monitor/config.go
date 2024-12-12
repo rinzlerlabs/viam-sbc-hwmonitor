@@ -12,11 +12,11 @@ type ComponentConfig struct {
 	IncludeEnv           bool   `json:"include_env"`
 	IncludeCmdline       bool   `json:"include_cmdline"`
 	IncludeCwd           bool   `json:"include_cwd"`
-	IncludeOpenFiles     bool   `json:"include_open_files"`
-	IncludeUlimits       bool   `json:"include_ulimits"`
-	IncludeNetStats      bool   `json:"include_net_stats"`
 	IncludeOpenFileCount bool   `json:"include_open_file_count"`
 	IncludeMemInfo       bool   `json:"include_mem_info"`
+	// IncludeOpenFiles     bool   `json:"include_open_files"`
+	// IncludeUlimits bool `json:"include_ulimits"`
+	// IncludeNetStats      bool   `json:"include_net_stats"`
 }
 
 func (conf *ComponentConfig) Validate(path string) ([]string, error) {

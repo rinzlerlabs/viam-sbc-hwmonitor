@@ -2,16 +2,16 @@ package process_monitor
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"math"
 	"os"
-	"strings"
 	"sync"
+	"time"
 
-	"github.com/shirou/gopsutil/v4/process"
 	"go.viam.com/rdk/components/sensor"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
+	goutils "go.viam.com/utils"
 
 	"github.com/rinzlerlabs/viam-raspi-sensors/utils"
 )
@@ -26,14 +26,17 @@ var (
 
 type Config struct {
 	resource.Named
-	mu         sync.RWMutex
+	mu         sync.Mutex
 	logger     logging.Logger
 	cancelCtx  context.Context
 	cancelFunc func()
-	process    *processConfig
+	info       *procInfo
+	process    *process
+	workers    *goutils.StoppableWorkers
+	readings   map[string]interface{}
 }
 
-type processConfig struct {
+type procInfo struct {
 	Name                 string
 	ExecutablePath       string
 	IncludeEnv           bool
@@ -62,7 +65,7 @@ func NewSensor(ctx context.Context, deps resource.Dependencies, conf resource.Co
 		logger:     logger,
 		cancelCtx:  cancelCtx,
 		cancelFunc: cancelFunc,
-		mu:         sync.RWMutex{},
+		mu:         sync.Mutex{},
 	}
 
 	if err := b.Reconfigure(ctx, deps, conf); err != nil {
@@ -81,211 +84,182 @@ func (c *Config) Reconfigure(ctx context.Context, _ resource.Dependencies, conf 
 		return err
 	}
 
-	c.process = &processConfig{
+	if newConf.Name == "" && newConf.ExecutablePath == "" {
+		return errors.New("either name or executable path must be set")
+	}
+
+	c.info = &procInfo{
 		Name:                 newConf.Name,
 		ExecutablePath:       newConf.ExecutablePath,
 		IncludeEnv:           newConf.IncludeEnv,
 		IncludeCmdline:       newConf.IncludeCmdline,
 		IncludeCwd:           newConf.IncludeCwd,
 		IncludeOpenFileCount: newConf.IncludeOpenFileCount,
-		IncludeOpenFiles:     newConf.IncludeOpenFiles,
-		IncludeUlimits:       newConf.IncludeUlimits,
-		IncludeNetStats:      newConf.IncludeNetStats,
 		IncludeMemInfo:       newConf.IncludeMemInfo,
+		// IncludeUlimits:       newConf.IncludeUlimits,
+		// IncludeOpenFiles:     newConf.IncludeOpenFiles,
+		// IncludeNetStats:      newConf.IncludeNetStats,
 	}
 
 	// In case the module has changed name
 	c.Named = conf.ResourceName().AsNamed()
 
+	c.workers = goutils.NewBackgroundStoppableWorkers(c.Update)
+
 	return nil
 }
 
-func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	ret := make(map[string]interface{})
-	procs, err := process.ProcessesWithContext(ctx)
+// check if the PID exists in /proc, if it doesn't, the process is no longer running
+func procExists(proc *process) bool {
+	if _, err := os.Stat(fmt.Sprintf("/proc/%d", proc.Pid)); os.IsNotExist(err) {
+		return false
+	}
+	return true
+}
+
+// Get the process to monitor, if it hasn't already been found, or is no longer running, try to find it (again)
+func (c *Config) getProcess() (*process, error) {
+	if c.process != nil && procExists(c.process) {
+		return c.process, nil
+	}
+
+	var proc *process
+	var err error
+	if c.info.ExecutablePath != "" {
+		proc, err = getProcessByExe(c.info.ExecutablePath)
+	} else if c.info.Name != "" {
+		proc, err = getProcessByName(c.info.Name)
+	} else {
+		return nil, errors.New("no process specified")
+	}
 	if err != nil {
 		return nil, err
 	}
-	for _, proc := range procs {
-		exe, err := proc.ExeWithContext(ctx)
-		if os.IsPermission(err) {
-			continue
-		}
-		if os.IsNotExist(err) {
-			continue
-		}
-		if err != nil {
-			c.logger.Warnf("Error getting process exe, skipping: %v", err)
-			continue
-		}
-		name, err := proc.NameWithContext(ctx)
-		if err != nil {
-			c.logger.Warnf("Error getting process name, skipping: %v", err)
-			continue
-		}
-
-		if c.process.Name != "" && c.process.Name != name {
-			continue
-		}
-
-		if c.process.ExecutablePath != "" && c.process.ExecutablePath != exe {
-			continue
-		}
-
-		cpu, err := proc.CPUPercentWithContext(ctx)
-		if err != nil {
-			c.logger.Warnf("Error getting process cpu: %v", err)
-		} else {
-			ret["cpu"] = math.Round(cpu*100) / 100
-		}
-
-		numThreads, err := proc.NumThreadsWithContext(ctx)
-		if err != nil {
-			c.logger.Warnf("Error getting process threads: %v", err)
-		} else {
-			ret["threads"] = numThreads
-		}
-
-		if c.process.IncludeMemInfo {
-			mem, err := proc.MemoryInfoWithContext(ctx)
-			if err != nil {
-				c.logger.Warnf("Error getting process memory: %v", err)
-			} else {
-				ret["rss"] = mem.RSS
-				ret["vms"] = mem.VMS
-				ret["hwm"] = mem.HWM
-				ret["data"] = mem.Data
-				ret["stack"] = mem.Stack
-				ret["locked"] = mem.Locked
-				ret["swap"] = mem.Swap
-			}
-		}
-
-		if c.process.IncludeOpenFileCount {
-			numOpenFiles, err := proc.NumFDsWithContext(ctx)
-			if err != nil {
-				c.logger.Warnf("Error getting process open files: %v", err)
-			} else {
-				ret["open_files"] = numOpenFiles
-			}
-		}
-
-		if c.process.IncludeEnv {
-			env, err := proc.EnvironWithContext(ctx)
-			if err != nil {
-				c.logger.Warnf("Error getting process env: %v", err)
-			} else {
-				for _, e := range env {
-					parts := strings.Split(e, "=")
-					if len(parts) == 2 {
-						ret[parts[0]] = parts[1]
-					}
-				}
-			}
-		}
-		if c.process.IncludeCmdline {
-			cmdline, err := proc.CmdlineWithContext(ctx)
-			if err != nil {
-				c.logger.Warnf("Error getting process cmdline: %v", err)
-			} else {
-				ret["cmdline"] = cmdline
-			}
-		}
-		if c.process.IncludeCwd {
-			cwd, err := proc.CwdWithContext(ctx)
-			if err != nil {
-				c.logger.Warnf("Error getting process cwd: %v", err)
-			} else {
-				ret["cwd"] = cwd
-			}
-		}
-		if c.process.IncludeOpenFiles {
-			openFiles, err := proc.OpenFilesWithContext(ctx)
-			if err != nil {
-				c.logger.Warnf("Error getting process open files: %v", err)
-			} else {
-				for i, f := range openFiles {
-					ret[fmt.Sprintf("open_file_%d", i)] = f.Path
-				}
-			}
-		}
-
-		if c.process.IncludeUlimits {
-			limits, err := proc.RlimitWithContext(ctx)
-			if err != nil {
-				c.logger.Warnf("Error getting process rlimits: %v", err)
-			} else {
-				for _, v := range limits {
-					ret[fmt.Sprintf("rlimit_%s_hard", resourceToString(v.Resource))] = v.Hard
-					ret[fmt.Sprintf("rlimit_%s_soft", resourceToString(v.Resource))] = v.Soft
-					ret[fmt.Sprintf("rlimit_%s_used", resourceToString(v.Resource))] = v.Used
-				}
-			}
-		}
-
-		if c.process.IncludeNetStats {
-			netstats, err := proc.ConnectionsWithContext(ctx)
-			if err != nil {
-				c.logger.Warnf("Error getting process net stats: %v", err)
-			} else {
-				ret["netstat_count"] = len(netstats)
-				for i, ns := range netstats {
-					ret[fmt.Sprintf("netstat_%d_family", i)] = ns.Family
-					ret[fmt.Sprintf("netstat_%d_type", i)] = ns.Type
-					ret[fmt.Sprintf("netstat_%d_laddr", i)] = ns.Laddr
-					ret[fmt.Sprintf("netstat_%d_raddr", i)] = ns.Raddr
-					ret[fmt.Sprintf("netstat_%d_status", i)] = ns.Status
-				}
-			}
-		}
-	}
-
-	return ret, nil
+	c.process = proc
+	return proc, nil
 }
 
-func resourceToString(r int32) string {
-	switch r {
-	case process.RLIMIT_AS:
-		return "as"
-	case process.RLIMIT_CORE:
-		return "core"
-	case process.RLIMIT_CPU:
-		return "cpu"
-	case process.RLIMIT_DATA:
-		return "data"
-	case process.RLIMIT_FSIZE:
-		return "fsize"
-	case process.RLIMIT_LOCKS:
-		return "locks"
-	case process.RLIMIT_MEMLOCK:
-		return "memlock"
-	case process.RLIMIT_MSGQUEUE:
-		return "msgqueue"
-	case process.RLIMIT_NICE:
-		return "nice"
-	case process.RLIMIT_NOFILE:
-		return "nofile"
-	case process.RLIMIT_NPROC:
-		return "nproc"
-	case process.RLIMIT_RSS:
-		return "rss"
-	case process.RLIMIT_RTPRIO:
-		return "rtprio"
-	case process.RLIMIT_RTTIME:
-		return "rttime"
-	case process.RLIMIT_SIGPENDING:
-		return "sigpending"
-	case process.RLIMIT_STACK:
-		return "stack"
-	default:
-		return fmt.Sprintf("unknown_%d", r)
+func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.readings, nil
+}
+
+func (c *Config) Update(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(1 * time.Second):
+			ret := make(map[string]interface{})
+
+			proc, err := c.getProcess()
+			if err != nil {
+				c.logger.Warnf("Error getting process: %v", err)
+				continue
+			}
+
+			err = proc.UpdateStats(ctx)
+			if err != nil {
+				c.logger.Warnf("Error updating process stats: %v", err)
+				continue
+			}
+
+			if c.info.Name != "" {
+				ret["name"] = proc.Name
+			}
+			if c.info.ExecutablePath != "" {
+				ret["exe"] = proc.Exe
+			}
+			ret["pid"] = proc.Pid
+			ret["cpu"] = proc.CPUPercent()
+			ret["cpu_since_boot"] = proc.CPUPercentSinceBoot()
+			ret["threads"] = proc.NumThreads()
+
+			if c.info.IncludeCwd {
+				ret["cwd"] = proc.Cwd
+			}
+			if c.info.IncludeCmdline {
+				ret["cmdline"] = proc.CmdLine
+			}
+			if c.info.IncludeOpenFileCount {
+				fc, err := proc.GetOpenFileCount()
+				if err != nil {
+					c.logger.Warnf("Error getting process open file count: %v", err)
+				} else {
+					ret["open_files"] = fc
+				}
+			}
+			if c.info.IncludeEnv {
+				env, err := proc.GetEnv()
+				if err != nil {
+					c.logger.Warnf("Error getting process environment: %v", err)
+				} else {
+					ret["env"] = env
+				}
+			}
+			if c.info.IncludeMemInfo {
+				mem, err := proc.GetMemoryInfo()
+				if err != nil {
+					c.logger.Warnf("Error getting process memory: %v", err)
+				} else {
+					ret["mem_rss"] = mem.VmRSS
+					ret["mem_hwm"] = mem.VmHWM
+					ret["mem_data"] = mem.VmData
+					ret["mem_stack"] = mem.VmStack
+					ret["mem_swap"] = mem.VmSwap
+					ret["mem_size"] = mem.VmSize
+				}
+			}
+
+			c.readings = ret
+		}
 	}
 }
+
+// func resourceToString(r int32) string {
+// 	switch r {
+// 	case process.RLIMIT_AS:
+// 		return "as"
+// 	case process.RLIMIT_CORE:
+// 		return "core"
+// 	case process.RLIMIT_CPU:
+// 		return "cpu"
+// 	case process.RLIMIT_DATA:
+// 		return "data"
+// 	case process.RLIMIT_FSIZE:
+// 		return "fsize"
+// 	case process.RLIMIT_LOCKS:
+// 		return "locks"
+// 	case process.RLIMIT_MEMLOCK:
+// 		return "memlock"
+// 	case process.RLIMIT_MSGQUEUE:
+// 		return "msgqueue"
+// 	case process.RLIMIT_NICE:
+// 		return "nice"
+// 	case process.RLIMIT_NOFILE:
+// 		return "nofile"
+// 	case process.RLIMIT_NPROC:
+// 		return "nproc"
+// 	case process.RLIMIT_RSS:
+// 		return "rss"
+// 	case process.RLIMIT_RTPRIO:
+// 		return "rtprio"
+// 	case process.RLIMIT_RTTIME:
+// 		return "rttime"
+// 	case process.RLIMIT_SIGPENDING:
+// 		return "sigpending"
+// 	case process.RLIMIT_STACK:
+// 		return "stack"
+// 	default:
+// 		return fmt.Sprintf("unknown_%d", r)
+// 	}
+// }
 
 func (c *Config) Close(ctx context.Context) error {
 	c.logger.Infof("Shutting down %s", PrettyName)
+	c.cancelFunc()
+	c.workers.Stop()
 	return nil
 }
 

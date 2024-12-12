@@ -15,8 +15,8 @@ func TestGetProcessInfo(t *testing.T) {
 	logger := logging.NewTestLogger(t)
 	ctx := context.Background()
 	sensor := &Config{
-		logger:  logger,
-		process: &processConfig{Name: "viam-agent", IncludeEnv: true, IncludeCmdline: true, IncludeCwd: true, IncludeOpenFiles: true, IncludeUlimits: true},
+		logger: logger,
+		info:   &procInfo{Name: "viam-agent", IncludeEnv: true, IncludeCmdline: true, IncludeCwd: true, IncludeOpenFiles: true, IncludeUlimits: true},
 	}
 	now := time.Now()
 	readings, err := sensor.Readings(ctx, nil)

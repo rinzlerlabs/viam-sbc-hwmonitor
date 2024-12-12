@@ -6,12 +6,14 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/rinzlerlabs/sbcidentify/boardtype"
+	. "github.com/rinzlerlabs/sbcidentify/test"
 	"github.com/stretchr/testify/assert"
 	"go.viam.com/rdk/logging"
-	// . "github.com/rinzlerlabs/sbcidentify/test"
 )
 
 func TestGetRaspPiClockSensorsReturnsAllSensors(t *testing.T) {
+	Test().RequiresBoardType(boardtype.RaspberryPi4).ShouldSkip(t)
 	logger := logging.NewTestLogger(t)
 	ctx := context.Background()
 	clocks, err := getRaspberryPiClockSensors(ctx, logger)

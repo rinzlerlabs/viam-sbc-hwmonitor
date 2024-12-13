@@ -17,6 +17,7 @@ import (
 	"github.com/rinzlerlabs/viam-raspi-sensors/throttling"
 	raspiutils "github.com/rinzlerlabs/viam-raspi-sensors/utils"
 	"github.com/rinzlerlabs/viam-raspi-sensors/voltages"
+	"github.com/rinzlerlabs/viam-raspi-sensors/wifi_monitor"
 )
 
 func main() {
@@ -33,5 +34,6 @@ func main() {
 	moduleutils.AddModularResource(memory_monitor.API, memory_monitor.Model)
 	moduleutils.AddModularResource(process_monitor.API, process_monitor.Model)
 	moduleutils.AddModularResource(disk_monitor.API, disk_monitor.Model)
+	moduleutils.AddModularResource(wifi_monitor.API, wifi_monitor.Model)
 	utils.ContextualMain(moduleutils.RunModule, logger)
 }

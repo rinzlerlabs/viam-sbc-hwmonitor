@@ -47,6 +47,10 @@
     {
       "api":"rdk:component:sensor",
       "model": "rinzlerlabs:hwmonitor:disk_monitor"
+    },
+    {
+      "api":"rdk:component:sensor",
+      "model": "rinzlerlabs:hwmonitor:wifi_monitor"
     }
   ],
   "build": {

@@ -70,7 +70,7 @@ func (c *Config) Reconfigure(ctx context.Context, _ resource.Dependencies, conf 
 	c.Named = conf.ResourceName().AsNamed()
 
 	if runtime.GOOS == "linux" {
-		mon := newLinuxWifiMonitor(newConf.Adapter)
+		mon := c.newLinuxWifiMonitor(newConf.Adapter)
 		if mon == nil {
 			return errors.New("no suitable wifi monitor found")
 		}
@@ -90,12 +90,18 @@ func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (ma
 	ret := make(map[string]interface{})
 	if c.wifiMonitor != nil {
 		status, err := c.wifiMonitor.GetNetworkStatus()
-		if err != nil {
+		if err == ErrAdapterNotFound {
+			ret["err"] = "adapter not found"
+		} else if err == ErrNotConnected {
+			ret["err"] = "not connected to a network"
+		} else if err != nil {
+			c.logger.Infof("Error getting network status: %v", err)
 			return nil, err
+		} else {
+			ret["network"] = status.NetworkName
+			ret["signal_strength"] = status.SignalStrength
+			ret["link_speed_mbps"] = status.LinkSpeedMbps
 		}
-		ret["network"] = status.NetworkName
-		ret["signal_strength"] = status.SignalStrength
-		ret["link_speed_mbps"] = status.LinkSpeedMbps
 	} else {
 		ret["network"] = "unknown"
 	}

@@ -6,25 +6,31 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+
+	"go.viam.com/rdk/logging"
 )
 
-func newLinuxWifiMonitor(adapter string) wifiMonitor {
+func (c *Config) newLinuxWifiMonitor(adapter string) wifiMonitor {
 	// iw has the best stats
 	if _, err := exec.LookPath("iw"); err == nil {
-		return &linuxIwWifiMonitor{adapter: adapter}
+		c.logger.Infof("Using iw for wifi stats")
+		return &linuxIwWifiMonitor{adapter: adapter, logger: c.logger}
 	}
 	// nmcli has good stats
 	if _, err := exec.LookPath("nmcli"); err == nil {
-		return &linuxNmcliWifiMonitor{adapter: adapter}
+		c.logger.Infof("Using nmcli for wifi stats")
+		return &linuxNmcliWifiMonitor{adapter: adapter, logger: c.logger}
 	}
 	// proc has basic stats
 	if _, err := os.Stat("/proc/net/wireless"); err == nil {
-		return &linuxProcWifiMonitor{adapter: adapter}
+		c.logger.Infof("Using /proc/net/wireless for wifi stats")
+		return &linuxProcWifiMonitor{adapter: adapter, logger: c.logger}
 	}
 	return nil
 }
 
 type linuxNmcliWifiMonitor struct {
+	logger  logging.Logger
 	adapter string
 }
 
@@ -41,7 +47,7 @@ func (w *linuxNmcliWifiMonitor) parseNetworkStatus(out string) (*networkStatus, 
 	adapterFound := false
 	lines := strings.Split(string(out), "\n")
 	for _, line := range lines {
-		if strings.HasSuffix(line, w.adapter) == false {
+		if !strings.HasSuffix(line, w.adapter) {
 			continue
 		}
 		adapterFound = true
@@ -67,7 +73,7 @@ func (w *linuxNmcliWifiMonitor) parseNetworkStatus(out string) (*networkStatus, 
 			}, e
 		}
 	}
-	if adapterFound == false {
+	if !adapterFound {
 		return nil, ErrAdapterNotFound
 	} else {
 		return nil, ErrNotConnected
@@ -75,6 +81,7 @@ func (w *linuxNmcliWifiMonitor) parseNetworkStatus(out string) (*networkStatus, 
 }
 
 type linuxIwWifiMonitor struct {
+	logger  logging.Logger
 	adapter string
 }
 
@@ -82,6 +89,9 @@ func (w *linuxIwWifiMonitor) GetNetworkStatus() (*networkStatus, error) {
 	cmd := exec.Command("iw", "dev", w.adapter, "link")
 	out, err := cmd.Output()
 	if err != nil {
+		if err.Error() == "exit status 237" {
+			return nil, ErrAdapterNotFound
+		}
 		return nil, err
 	}
 
@@ -126,6 +136,7 @@ func (w *linuxIwWifiMonitor) parseNetworkStatus(out string) (*networkStatus, err
 }
 
 type linuxProcWifiMonitor struct {
+	logger  logging.Logger
 	adapter string
 }
 

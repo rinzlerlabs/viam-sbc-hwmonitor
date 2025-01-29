@@ -19,8 +19,8 @@ var (
 )
 
 func ReadFileWithContext(ctx context.Context, path string) (string, error) {
-	fileChan := make(chan []byte)
-	errChan := make(chan error)
+	fileChan := make(chan []byte, 1)
+	errChan := make(chan error, 1)
 	go func() {
 		data, err := os.ReadFile(path)
 		if err != nil {

@@ -1,0 +1,18 @@
+{
+    "name": "Go Cross-Compiler",
+    "build": {
+      "dockerfile": "Dockerfile"
+    },
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "golang.go",
+                "ms-vscode.go"
+            ]
+        }
+    },
+    "mounts": [
+      "source=${localWorkspaceFolder},target=/workspace,type=bind"
+    ],
+    "workspaceFolder": "/workspace"
+  }

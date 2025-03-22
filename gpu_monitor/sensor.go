@@ -29,7 +29,7 @@ type Config struct {
 	cancelCtx  context.Context
 	cancelFunc func()
 	task       func()
-	stats      *utils.CappedCollection[sample]
+	stats      utils.CappedCollection[sample]
 	sleepTime  time.Duration
 }
 

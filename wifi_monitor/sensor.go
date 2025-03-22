@@ -77,6 +77,8 @@ func (c *Config) Reconfigure(ctx context.Context, _ resource.Dependencies, conf 
 		c.wifiMonitor = mon
 	} else if runtime.GOOS == "darwin" {
 		c.wifiMonitor = &macOsWifiMonitor{}
+	} else if runtime.GOOS == "windows" {
+		c.wifiMonitor = &windowsWifiMonitor{}
 	} else {
 		c.wifiMonitor = nil
 	}

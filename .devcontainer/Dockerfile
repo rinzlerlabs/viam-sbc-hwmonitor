@@ -1,6 +1,6 @@
 FROM golang:1.23-alpine
 
-RUN apk add --no-cache bash git make curl ssh
+RUN apk add --no-cache bash git make curl openssh
 
 # Install Viam RDK CLI
 RUN ARCH=$(go env GOARCH) && \

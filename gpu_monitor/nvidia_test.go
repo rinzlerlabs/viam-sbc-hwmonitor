@@ -16,6 +16,6 @@ func TestNvidiaGPU(t *testing.T) {
 	require.NotNil(t, monitor)
 	stats, err := monitor.GetGPUStats(ctx)
 	require.NoError(t, err)
-	require.True(t, len(stats) > 0, "Expected GPU stats to be non-empty")
-	logger.Infof("GPU Stats: %v", stats)
+	require.Len(t, stats, 11)
+	logger.Infof("GPU Stats: %#v", stats)
 }

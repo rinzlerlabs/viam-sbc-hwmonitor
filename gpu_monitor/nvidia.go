@@ -93,13 +93,8 @@ func newNvidiaGpu(logger logging.Logger, index int) (*nvidiaGpu, error) {
 		return nil, errors.Join(ret, fmt.Errorf("failed to get device name for GPU %d", index))
 	}
 	sensors := make([]gpuSensor, 0)
-	for name, clockType := range clockTypes { // Iterate over default clocks, not all clocks are supported so we check each one
-		_, ret := nvmlDevice.GetClockInfo(clockType) // Current clocks
-		if ret != nvml.SUCCESS {
-			logger.Warnf("Failed to get clock info for device %s: %v", name, ret)
-			continue
-		}
-		s, err := newNvidiaGpuClockSensor(name, nvmlDevice, clockType)
+	for name, _ := range clockTypes { // Iterate over default clocks, not all clocks are supported so we check each one
+		s, err := newNvidiaGpuClockSensor(name, nvmlDevice)
 		if err != nil {
 			logger.Errorf("Failed to create clock sensor for device %s: %v", name, err)
 			continue
@@ -155,91 +150,15 @@ func (d *nvidiaGpu) Close() error {
 	return nil
 }
 
-func newNvidiaGpuClockSensor(name string, nvmlDevice nvml.Device, clockType nvml.ClockType) (*nvidiaGpuClock, error) {
+func newNvidiaGpuClockSensor(name string, nvmlDevice nvml.Device) (*nvidiaGpuSensor, error) {
 	if nvmlDevice == nil {
 		return nil, fmt.Errorf("nvmlDevice cannot be nil")
 	}
-	maxFreq, ret := nvmlDevice.GetMaxClockInfo(clockType)
-	if ret != nvml.SUCCESS {
-		return nil, errors.Join(ret, fmt.Errorf("failed to get max clock info for %s", name))
-	}
-	return &nvidiaGpuClock{
-		name:         name,
-		clockType:    clockType,
-		nvmlDevice:   nvmlDevice,
-		maxFrequency: maxFreq,
+	return &nvidiaGpuSensor{
+		name:       name,
+		sensorType: GPUSensorTypeFrequency,
+		nvmlDevice: nvmlDevice,
 	}, nil
-}
-
-type nvidiaGpuClock struct {
-	name         string
-	clockType    nvml.ClockType
-	nvmlDevice   nvml.Device
-	maxFrequency uint32
-}
-
-func (s *nvidiaGpuClock) Name() string {
-	return s.name
-}
-
-func (s *nvidiaGpuClock) GetSensorReading(context.Context) (*gpuSensorReading, error) {
-	reading := &gpuSensorReading{
-		Name: s.name,
-		Type: GPUSensorTypeFrequency,
-	}
-	if s.HasMinValue() {
-		minFreq, err := s.MinValue()
-		if err != nil {
-			return nil, err
-		}
-		reading.MinValue = int64(minFreq)
-	}
-	if s.HasMaxValue() {
-		maxFreq, err := s.MaxValue()
-		if err != nil {
-			return nil, err
-		}
-		reading.MaxValue = int64(maxFreq)
-	}
-	if s.HasCurrentValue() {
-		curFreq, err := s.CurrentValue()
-		if err != nil {
-			return nil, err
-		}
-		reading.CurrentValue = int64(curFreq)
-	}
-	return reading, nil
-}
-
-func (s *nvidiaGpuClock) HasMinValue() bool {
-	return false
-}
-
-func (s *nvidiaGpuClock) MinValue() (float64, error) {
-	return 0, nil
-}
-
-func (s *nvidiaGpuClock) HasMaxValue() bool {
-	return true
-}
-
-func (s *nvidiaGpuClock) MaxValue() (float64, error) {
-	return float64(s.maxFrequency), nil
-}
-
-func (s *nvidiaGpuClock) HasCurrentValue() bool {
-	return true
-}
-
-func (s *nvidiaGpuClock) CurrentValue() (float64, error) {
-	if !s.HasCurrentValue() {
-		return 0, errors.New("current value not supported for this sensor")
-	}
-	frequency, ret := s.nvmlDevice.GetClockInfo(s.clockType)
-	if ret != nvml.SUCCESS {
-		return 0, errors.Join(ret, fmt.Errorf("failed to get current clock frequency for %s", s.name))
-	}
-	return float64(frequency), nil
 }
 
 func newNvidiaGpuSensor(name string, nvmlDevice nvml.Device, sensorType gpuSensorType) (*nvidiaGpuSensor, error) {
@@ -269,7 +188,7 @@ func (s *nvidiaGpuSensor) Name() string {
 func (s *nvidiaGpuSensor) GetSensorReading(context.Context) (*gpuSensorReading, error) {
 	reading := &gpuSensorReading{
 		Name: s.name,
-		Type: GPUSensorTypeFrequency,
+		Type: s.sensorType,
 	}
 	if s.HasMinValue() {
 		minFreq, err := s.MinValue()
@@ -372,7 +291,12 @@ func getReading(sensorType gpuSensorType, sensor string, nvmlDevice nvml.Device)
 			return nil, errUnsupportedSensorType
 		}
 	case GPUSensorTypeFrequency:
-		panic("foo")
+		if clockType, ok := clockTypes[sensor]; !ok {
+			return nil, fmt.Errorf("unsupported clock type: %s", sensor)
+		} else {
+			val, ret := nvmlDevice.GetClockInfo(clockType)
+			return []uint32{val}, ret
+		}
 	case GPUSensorTypeMemory:
 		switch sensor {
 		case "mem":

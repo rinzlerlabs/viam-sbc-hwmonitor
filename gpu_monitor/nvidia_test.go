@@ -1,3 +1,6 @@
+//go:build full_nvidia_support
+// +build full_nvidia_support
+
 package gpu_monitor
 
 import (

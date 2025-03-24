@@ -3,6 +3,7 @@ package gpu_monitor
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,20 +15,14 @@ import (
 var (
 	ErrDevicePathNotFound = errors.New("device path not found")
 	ErrStatsNotAvailable  = errors.New("stats not available for this device")
-	searchPaths           = []string{
-		"/sys/devices/platform/bus@0/",
-		"/sys/devices/platform/",
-	}
 
-	frequencyBasePath     = "/sys/class/devfreq/"
-	statsEnabledPostfixes = []string{"gpu", "ga10b", "gp10b"}
-	deviceCounts          = make(map[string]int)
-	jetsonClockSensors    = map[string]string{
+	frequencyBasePath  = "/sys/class/devfreq/"
+	jetsonClockSensors = map[string]string{
 		"nvenc": "encoder",
 		"nvdec": "decoder",
 		"nvjpg": "jpg",
 		"ofa":   "ofa",
-		"gpu":   "graphis",
+		"gpu":   "graphic",
 		"vic":   "vic",
 	}
 	jetpack5LoadSensors = map[string]string{
@@ -38,149 +33,111 @@ var (
 	}
 )
 
-func getStatsPath(name string) (string, error) {
-	isStatsEnabled := false
-	for _, postfix := range statsEnabledPostfixes {
-		if strings.Contains(name, postfix) {
-			isStatsEnabled = true
-		}
-	}
-	if !isStatsEnabled {
-		return "", nil
-	}
-	for _, path := range searchPaths {
-		devicePath := filepath.Join(path, name)
-		if _, err := os.Stat(devicePath); err == nil {
-			return devicePath, nil
-		}
-	}
-	return "", ErrDevicePathNotFound
-}
-
-func newJetsonGpuComponent(fullname string) (*jetsonGpuComponent, error) {
-	prettyName := fullname
-	parts := strings.Split(fullname, ".")
-	if len(parts) > 1 {
-		prettyName = parts[1]
-	}
-	statsPath, err := getStatsPath(fullname)
-	if err != nil {
-		return nil, err
-	}
-	device := &jetsonGpuComponent{
-		Name:          fullname,
-		PrettyName:    prettyName,
-		FrequencyPath: filepath.Join(frequencyBasePath, fullname),
-		StatsPath:     statsPath,
-	}
-	return device, nil
-}
-
-type jetsonGpuComponent struct {
-	Name          string
-	PrettyName    string
-	FrequencyPath string
-	StatsPath     string
-	minFrequency  *int64
-	maxFrequency  *int64
-}
-
-func (d *jetsonGpuComponent) GetGovernor(ctx context.Context) (string, error) {
-	govPath := filepath.Join(d.FrequencyPath, "governor")
-	return utils.ReadFileWithContext(ctx, govPath)
-}
-
-func (d *jetsonGpuComponent) GetLoad(ctx context.Context) (float64, error) {
-	if d.StatsPath == "" {
-		return 0, ErrStatsNotAvailable
-	}
-	loadPath := filepath.Join(d.StatsPath, "load")
-	load, err := utils.ReadInt64FromFileWithContext(ctx, loadPath)
-	return float64(load), err
-}
-
 type jetsonGpuMonitor struct {
 	logger  logging.Logger
 	sensors []gpuSensor
 }
 
-type jetsonGpuClock struct {
-	name         string
-	path         string
-	maxFrequency *int64
-	minFrequency *int64
-}
-
-func (d *jetsonGpuClock) getCurrentFrequency(ctx context.Context) (int64, error) {
-	freqPath := filepath.Join(d.path, "cur_freq")
-	return utils.ReadInt64FromFileWithContext(ctx, freqPath)
-}
-
-func (d *jetsonGpuClock) getMaxFrequency(ctx context.Context) (int64, error) {
-	if d.maxFrequency != nil {
-		return *d.maxFrequency, nil
+func newJetsonGpuFrequencySensor(name string, path string) *jetsonGpuSensor {
+	return &jetsonGpuSensor{
+		name:             name,
+		sensorType:       GPUSensorTypeFrequency,
+		currentValuePath: filepath.Join(path, "cur_freq"),
+		minValuePath:     filepath.Join(path, "min_freq"),
+		maxValuePath:     filepath.Join(path, "max_freq"),
 	}
-	freqPath := filepath.Join(d.path, "max_freq")
-	freq, err := utils.ReadInt64FromFileWithContext(ctx, freqPath)
+}
+
+func newJetsonGpuLoadSensor(name, path string) *jetsonGpuSensor {
+	minValue := int64(0)
+	maxValue := int64(100)
+	return &jetsonGpuSensor{
+		name:             name,
+		sensorType:       GPUSensorTypeLoad,
+		currentValuePath: path,
+		minValue:         &minValue,
+		maxValue:         &maxValue,
+	}
+}
+
+type jetsonGpuSensor struct {
+	name             string
+	sensorType       gpuSensorType
+	currentValuePath string
+	minValuePath     string
+	maxValuePath     string
+	minValue         *int64
+	maxValue         *int64
+}
+
+func (d *jetsonGpuSensor) CurrentValue(ctx context.Context) (int64, error) {
+	return utils.ReadInt64FromFileWithContext(ctx, d.currentValuePath)
+}
+
+func (d *jetsonGpuSensor) MaxValue(ctx context.Context) (int64, error) {
+	if d.maxValue != nil {
+		return *d.maxValue, nil
+	}
+	freq, err := utils.ReadInt64FromFileWithContext(ctx, d.maxValuePath)
 	if err != nil {
 		return 0, err
 	}
 	// cache the value for the future
-	d.maxFrequency = &freq
+	d.maxValue = &freq
 	return freq, nil
 }
 
-func (d *jetsonGpuClock) getMinFrequency(ctx context.Context) (int64, error) {
-	if d.minFrequency != nil {
-		return *d.minFrequency, nil
+func (d *jetsonGpuSensor) MinValue(ctx context.Context) (int64, error) {
+	if d.minValue != nil {
+		return *d.minValue, nil
 	}
-	freqPath := filepath.Join(d.path, "min_freq")
-	freq, err := utils.ReadInt64FromFileWithContext(ctx, freqPath)
+	freq, err := utils.ReadInt64FromFileWithContext(ctx, d.minValuePath)
 	if err != nil {
 		return 0, err
 	}
 	// cache the value for the future
-	d.minFrequency = &freq
+	d.minValue = &freq
 	return freq, nil
 }
 
-func (s *jetsonGpuClock) Name() string {
+func (s *jetsonGpuSensor) Name() string {
 	return s.name
 }
 
-func (s *jetsonGpuClock) GetSensorReading(ctx context.Context) (*gpuSensorReading, error) {
-	curFreq, err := s.getCurrentFrequency(ctx)
+func (s *jetsonGpuSensor) GetSensorReading(ctx context.Context) (*gpuSensorReading, error) {
+	currentValue, err := s.CurrentValue(ctx)
 	if err != nil {
 		return nil, err
 	}
-	maxFreq, err := s.getMaxFrequency(ctx)
+	maxValue, err := s.MaxValue(ctx)
 	if err != nil {
 		return nil, err
 	}
-	minFreq, err := s.getMinFrequency(ctx)
+	minValue, err := s.MinValue(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	return &gpuSensorReading{
 		Name:         s.name,
-		Type:         GPUSensorTypeFrequency,
-		CurrentValue: curFreq,
-		MaxValue:     maxFreq,
-		MinValue:     minFreq,
+		Type:         s.sensorType,
+		CurrentValue: currentValue,
+		MaxValue:     maxValue,
+		MinValue:     minValue,
 	}, nil
 }
 
-func newJetsonGpuMonitor(ctx context.Context, logger logging.Logger) (gpuMonitor, error) {
-	devices := make([]gpuSensor, 0)
+func getJetsonGpuClockSensors() ([]gpuSensor, error) {
+	clockSensors := make([]gpuSensor, 0)
 	dirs, err := os.ReadDir(frequencyBasePath)
 	if err != nil {
 		return nil, err
 	}
+	dupeNames := make(map[string]int)
 	for _, dir := range dirs {
 		name := dir.Name()
 		isValidDevice := false
-		for _, postfix := range jetsonClockSensors {
+		for postfix, _ := range jetsonClockSensors {
 			if strings.Contains(name, postfix) {
 				isValidDevice = true
 			}
@@ -200,35 +157,51 @@ func newJetsonGpuMonitor(ctx context.Context, logger logging.Logger) (gpuMonitor
 		if !dirInfo.IsDir() {
 			continue
 		}
-		logger.Infof("Found GPU Sensor %s", name)
-		// device, err := newJetsonGpuComponent(ctx, name)
-		// if err != nil {
-		// 	return nil, err
-		// }
-		// if _, ok := deviceCounts[device.PrettyName]; !ok {
-		// 	deviceCounts[device.PrettyName] = 0
-
-		// } else {
-		// 	deviceCounts[device.PrettyName]++
-		// }
-		// device.PrettyName = fmt.Sprintf("%s%d", device.PrettyName, deviceCounts[device.PrettyName])
-		// for _, dev := range devices {
-		// 	if dev.PrettyName == device.PrettyName {
-		// 		device.PrettyName = device.PrettyName + "2"
-		// 	}
-		// }
-		// devices = append(devices, device)
+		fmt.Printf("Found GPU Sensor %s\n", name)
+		prettyName := strings.Split(name, ".")[1]
+		if _, ok := dupeNames[prettyName]; ok {
+			prettyName = fmt.Sprintf("%s_%d", prettyName, dupeNames[prettyName])
+		}
+		dupeNames[prettyName]++
+		sensor := newJetsonGpuFrequencySensor(prettyName, realPath)
+		clockSensors = append(clockSensors, sensor)
 	}
+	return clockSensors, nil
+}
+
+func getJetsonGpuLoadSensors() ([]gpuSensor, error) {
+	if _, err := os.Stat(jetpack5LoadSensors["gpu"]); !os.IsNotExist(err) {
+		return []gpuSensor{newJetsonGpuLoadSensor("gpu", jetpack5LoadSensors["gpu"])}, nil
+	} else if _, err := os.Stat(jetpack6LoadSensors["gpu"]); !os.IsNotExist(err) {
+		return []gpuSensor{newJetsonGpuLoadSensor("gpu", jetpack6LoadSensors["gpu"])}, nil
+	}
+
+	return nil, errors.New("no load sensors found")
+}
+
+func newJetsonGpuMonitor(logger logging.Logger) (gpuMonitor, error) {
+	devices := make([]gpuSensor, 0)
+	clocks, err := getJetsonGpuClockSensors()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get GPU clock sensors: %w", err)
+	}
+	devices = append(devices, clocks...)
+	loadSensors, err := getJetsonGpuLoadSensors()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get GPU load sensors: %w", err)
+	}
+	devices = append(devices, loadSensors...)
+
 	return &jetsonGpuMonitor{logger: logger, sensors: devices}, nil
 }
 
 func (m *jetsonGpuMonitor) GetGPUStats(ctx context.Context) ([]gpuSensorReading, error) {
 	stats := make([]gpuSensorReading, 0)
 	for _, device := range m.sensors {
-		m.logger.Debugf("Getting stats for %s", device.Name)
+		m.logger.Debugf("Getting stats for %s", device.Name())
 		stat, err := device.GetSensorReading(ctx)
 		if err != nil {
-			m.logger.Errorf("Failed to get sensor reading for %s: %v", device.Name, err)
+			m.logger.Errorf("Failed to get sensor reading for %s: %v", device.Name(), err)
 			continue
 		}
 		stats = append(stats, *stat)

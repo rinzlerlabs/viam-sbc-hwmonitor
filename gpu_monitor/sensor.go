@@ -112,15 +112,30 @@ func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (ma
 
 	tmp := make(map[string]float64)
 	for name, stats := range m {
+		statCount := map[gpuSensorType]int{}
 		for _, stat := range stats {
-			tmp[fmt.Sprintf("%s-current_frequency", name)] += float64(stat.CurrentValue)
-			tmp[fmt.Sprintf("%s-max_frequency", name)] += float64(stat.MaxValue)
-			tmp[fmt.Sprintf("%s-min_frequency", name)] += float64(stat.MinValue)
+			switch stat.Type {
+			case GPUSensorTypeFrequency:
+				tmp[fmt.Sprintf("%s-current_frequency", name)] += float64(stat.CurrentValue)
+				tmp[fmt.Sprintf("%s-max_frequency", name)] += float64(stat.MaxValue)
+				tmp[fmt.Sprintf("%s-min_frequency", name)] += float64(stat.MinValue)
+				statCount[GPUSensorTypeFrequency]++
+			case GPUSensorTypeLoad:
+				tmp[fmt.Sprintf("%s-load", name)] += float64(stat.CurrentValue)
+				statCount[GPUSensorTypeLoad]++
+			}
 		}
-		tmp[fmt.Sprintf("%s-current_frequency", name)] /= float64(len(stats))
-		tmp[fmt.Sprintf("%s-max_frequency", name)] /= float64(len(stats))
-		tmp[fmt.Sprintf("%s-min_frequency", name)] /= float64(len(stats))
-		tmp[fmt.Sprintf("%s-load", name)] /= float64(len(stats))
+		// Average the values
+		for t, count := range statCount {
+			switch t {
+			case GPUSensorTypeFrequency:
+				tmp[fmt.Sprintf("%s-current_frequency", name)] /= float64(count)
+				tmp[fmt.Sprintf("%s-max_frequency", name)] /= float64(count)
+				tmp[fmt.Sprintf("%s-min_frequency", name)] /= float64(count)
+			case GPUSensorTypeLoad:
+				tmp[fmt.Sprintf("%s-load", name)] /= float64(len(stats))
+			}
+		}
 	}
 
 	ret := make(map[string]interface{})
@@ -148,7 +163,7 @@ func (c *Config) Ready(ctx context.Context, extra map[string]interface{}) (bool,
 func (c *Config) captureGPUStats() {
 	c.wg.Add(1)
 	defer c.wg.Done()
-	gpuMonitor, err := newGpuMonitor(c.cancelCtx, c.logger)
+	gpuMonitor, err := newGpuMonitor(c.logger)
 	if err != nil {
 		c.logger.Warnf("Failed to initialize GPU monitor: %v", err)
 		return

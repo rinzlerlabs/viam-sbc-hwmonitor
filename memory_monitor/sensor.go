@@ -63,11 +63,6 @@ func (c *Config) Reconfigure(ctx context.Context, _ resource.Dependencies, conf 
 	defer c.mu.Unlock()
 	c.logger.Debugf("Reconfiguring %s", PrettyName)
 
-	// newConf, err := resource.NativeConfig[*ComponentConfig](conf)
-	// if err != nil {
-	// 	return err
-	// }
-
 	// In case the module has changed name
 	c.Named = conf.ResourceName().AsNamed()
 

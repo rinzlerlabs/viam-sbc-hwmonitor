@@ -29,7 +29,7 @@ define BUILD_TEMPLATE
 build_$(subst /,_,$(1)):
 	@echo "Building $(BIN_NAME) for $(1)..."
 	@GOOS=$(word 1,$(subst /, ,$(1))) GOARCH=$(word 2,$(subst /, ,$(1))) \
-		CGO_ENALBED=1 \
+		CGO_ENABLED=1 \
 		go build -o $(BIN) $(ENTRY_POINT)
 endef
 

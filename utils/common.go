@@ -3,6 +3,7 @@ package utils
 import (
 	"context"
 	"errors"
+	"io"
 	"math"
 	"os"
 	"os/exec"
@@ -21,8 +22,13 @@ var (
 func ReadFileWithContext(ctx context.Context, path string) (string, error) {
 	fileChan := make(chan []byte, 1)
 	errChan := make(chan error, 1)
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
 	go func() {
-		data, err := os.ReadFile(path)
+		defer f.Close()
+		data, err := io.ReadAll(f)
 		if err != nil {
 			errChan <- err
 			return
@@ -31,6 +37,11 @@ func ReadFileWithContext(ctx context.Context, path string) (string, error) {
 	}()
 	select {
 	case <-ctx.Done():
+		// Force close the file to unblock the ReadAll
+		err = f.Close()
+		if err != nil {
+			return "", errors.Join(err, ctx.Err())
+		}
 		return "", ctx.Err()
 	case data := <-fileChan:
 		return strings.TrimSpace(string(data)), nil

@@ -1,12 +1,11 @@
 FROM golang:1.23-bookworm
+ENV GOLANG_VERSION 1.23.7
 
-RUN sed -i 's/^Components: main$/& contrib non-free non-free-firmware/' /etc/apt/sources.list.d/debian.sources
 RUN apt update && apt install -y \
     build-essential \
     git \
     curl \
-    ssh \
-    libnvidia-ml-dev
+    ssh 
 
 # Install Viam RDK CLI
 RUN ARCH=$(go env GOARCH) && \

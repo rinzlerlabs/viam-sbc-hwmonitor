@@ -25,7 +25,7 @@ var (
 
 	nvidiaLoadSensors   = []string{"encoder", "decoder", "jpg", "ofa"}                     // Sensors that report load (utilization) values
 	nvidiaPowerSensors  = []string{"power", "power_limit", "default_limit", "power_state"} // Sensors that report power values
-	nvidiaMemorySensors = []string{"mem", "graphics", "sm", "video"}                       // Sensors that report memory values
+	nvidiaMemorySensors = []string{"mem"}                                                  // Sensors that report memory values
 )
 
 func hasNVIDIAGPU() bool {
@@ -40,7 +40,7 @@ func newNVIDIAGpuMonitor(logger logging.Logger) (gpuMonitor, error) {
 		logger.Errorf("Failed to acquire NVML: %v", ret)
 		return nil, ret
 	}
-	gpus := make([]*nvidiaGpu, 0)
+	gpus := make([]nvidiaGpu, 0)
 	deviceCount, ret := nvml.DeviceGetCount()
 	if ret != nvml.SUCCESS {
 		logger.Errorf("Failed to get device count: %v", ret)
@@ -52,22 +52,22 @@ func newNVIDIAGpuMonitor(logger logging.Logger) (gpuMonitor, error) {
 			logger.Errorf("Failed to create GPU %d: %v", i, err)
 			continue
 		}
-		gpus = append(gpus, gpu)
+		gpus = append(gpus, *gpu)
 	}
 	return &nvidiaGpuMonitor{logger: logger, gpus: gpus}, nil
 }
 
 type nvidiaGpuMonitor struct {
 	logger logging.Logger
-	gpus   []*nvidiaGpu
+	gpus   []nvidiaGpu
 }
 
 func (n *nvidiaGpuMonitor) Close() error {
 	return utils.NVMLManager.Release()
 }
 
-func (n *nvidiaGpuMonitor) GetGPUStats(ctx context.Context) ([]*gpuSensorReading, error) {
-	stats := make([]*gpuSensorReading, 0)
+func (n *nvidiaGpuMonitor) GetGPUStats(ctx context.Context) ([]gpuSensorReading, error) {
+	stats := make([]gpuSensorReading, 0)
 	for _, gpu := range n.gpus {
 		for _, sensor := range gpu.sensors {
 			stat, err := sensor.GetSensorReading(ctx)
@@ -75,7 +75,7 @@ func (n *nvidiaGpuMonitor) GetGPUStats(ctx context.Context) ([]*gpuSensorReading
 				n.logger.Errorf("Failed to get sensor reading for %s: %v", sensor.Name(), err)
 				continue
 			}
-			stats = append(stats, stat)
+			stats = append(stats, *stat)
 		}
 	}
 	return stats, nil
@@ -99,37 +99,33 @@ func newNvidiaGpu(logger logging.Logger, index int) (*nvidiaGpu, error) {
 			logger.Warnf("Failed to get clock info for device %s: %v", name, ret)
 			continue
 		}
-		maxFreq, ret := nvmlDevice.GetMaxClockInfo(clockType) // Max clocks
-		if ret != nvml.SUCCESS {
-			logger.Warnf("Failed to get max clock info for device %s: %v", name, ret)
+		s, err := newNvidiaGpuClockSensor(name, nvmlDevice, clockType)
+		if err != nil {
+			logger.Errorf("Failed to create clock sensor for device %s: %v", name, err)
 			continue
 		}
-		sensors = append(sensors, &nvidiaGpuClock{
-			name:         name, // TODO: Tweak this name...
-			clockType:    clockType,
-			maxFrequency: maxFreq,
-		})
+		sensors = append(sensors, s)
 	}
 
 	for _, loadSensor := range nvidiaLoadSensors {
-		if s, err := newNvidiaGpuSensor(loadSensor, nvmlDevice, GPUSensorTypeLoad); err == nil {
+		if s, ret := newNvidiaGpuSensor(loadSensor, nvmlDevice, GPUSensorTypeLoad); ret == nvml.SUCCESS || ret == nil {
 			sensors = append(sensors, s)
 		} else {
-			logger.Errorf("Failed to create %s sensor for device %s: %v", loadSensor, name, err)
+			logger.Errorf("Failed to create %s sensor for device %s: %v", loadSensor, name, ret)
 		}
 	}
 	for _, powerSensor := range nvidiaPowerSensors {
-		if s, err := newNvidiaGpuSensor(powerSensor, nvmlDevice, GPUSensorTypePower); err == nil {
+		if s, ret := newNvidiaGpuSensor(powerSensor, nvmlDevice, GPUSensorTypePower); ret == nvml.SUCCESS || ret == nil {
 			sensors = append(sensors, s)
 		} else {
-			logger.Errorf("Failed to create %s sensor for device %s: %v", powerSensor, name, err)
+			logger.Errorf("Failed to create %s sensor for device %s: %v", powerSensor, name, ret)
 		}
 	}
 	for _, memorySensor := range nvidiaMemorySensors {
-		if s, err := newNvidiaGpuSensor(memorySensor, nvmlDevice, GPUSensorTypeMemory); err == nil {
+		if s, ret := newNvidiaGpuSensor(memorySensor, nvmlDevice, GPUSensorTypeMemory); ret == nvml.SUCCESS || ret == nil {
 			sensors = append(sensors, s)
 		} else {
-			logger.Errorf("Failed to create %s sensor for device %s: %v", memorySensor, name, err)
+			logger.Errorf("Failed to create %s sensor for device %s: %v", memorySensor, name, ret)
 		}
 	}
 	return &nvidiaGpu{
@@ -157,6 +153,22 @@ func (d *nvidiaGpu) Close() error {
 		return ret
 	}
 	return nil
+}
+
+func newNvidiaGpuClockSensor(name string, nvmlDevice nvml.Device, clockType nvml.ClockType) (*nvidiaGpuClock, error) {
+	if nvmlDevice == nil {
+		return nil, fmt.Errorf("nvmlDevice cannot be nil")
+	}
+	maxFreq, ret := nvmlDevice.GetMaxClockInfo(clockType)
+	if ret != nvml.SUCCESS {
+		return nil, errors.Join(ret, fmt.Errorf("failed to get max clock info for %s", name))
+	}
+	return &nvidiaGpuClock{
+		name:         name,
+		clockType:    clockType,
+		nvmlDevice:   nvmlDevice,
+		maxFrequency: maxFreq,
+	}, nil
 }
 
 type nvidiaGpuClock struct {
@@ -231,7 +243,10 @@ func (s *nvidiaGpuClock) CurrentValue() (float64, error) {
 }
 
 func newNvidiaGpuSensor(name string, nvmlDevice nvml.Device, sensorType gpuSensorType) (*nvidiaGpuSensor, error) {
-	if _, err := getReading(sensorType, name, nvmlDevice); err != nil {
+	if nvmlDevice == nil {
+		return nil, fmt.Errorf("nvmlDevice cannot be nil")
+	}
+	if _, err := getReading(sensorType, name, nvmlDevice); err != nvml.SUCCESS {
 		return nil, err
 	}
 	return &nvidiaGpuSensor{
@@ -245,7 +260,6 @@ type nvidiaGpuSensor struct {
 	name       string
 	sensorType gpuSensorType
 	nvmlDevice nvml.Device
-	sensor     string
 }
 
 func (s *nvidiaGpuSensor) Name() string {
@@ -311,8 +325,8 @@ func (s *nvidiaGpuSensor) CurrentValue() (float64, error) {
 	if !s.HasCurrentValue() {
 		return 0, errors.New("current value not supported for this sensor")
 	}
-	vals, err := getReading(s.sensorType, s.sensor, s.nvmlDevice)
-	if err != nil {
+	vals, err := getReading(s.sensorType, s.name, s.nvmlDevice)
+	if err != nvml.SUCCESS && err != nil {
 		return 0, err
 	}
 	if len(vals) == 0 {
@@ -354,12 +368,19 @@ func getReading(sensorType gpuSensorType, sensor string, nvmlDevice nvml.Device)
 		case "ofa":
 			val1, val2, ret := nvmlDevice.GetOfaUtilization()
 			return []uint32{val1, val2}, ret
-
 		default:
 			return nil, errUnsupportedSensorType
 		}
 	case GPUSensorTypeFrequency:
 		panic("foo")
+	case GPUSensorTypeMemory:
+		switch sensor {
+		case "mem":
+			mem, ret := nvmlDevice.GetMemoryInfo()
+			return []uint32{uint32(mem.Used), uint32(mem.Total)}, ret
+		default:
+			return nil, errUnsupportedSensorType
+		}
 	default:
 		return nil, fmt.Errorf("unsupported sensor type: %s", sensorType)
 	}

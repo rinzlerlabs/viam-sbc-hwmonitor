@@ -222,8 +222,8 @@ func newJetsonGpuMonitor(ctx context.Context, logger logging.Logger) (gpuMonitor
 	return &jetsonGpuMonitor{logger: logger, sensors: devices}, nil
 }
 
-func (m *jetsonGpuMonitor) GetGPUStats(ctx context.Context) ([]*gpuSensorReading, error) {
-	stats := make([]*gpuSensorReading, 0)
+func (m *jetsonGpuMonitor) GetGPUStats(ctx context.Context) ([]gpuSensorReading, error) {
+	stats := make([]gpuSensorReading, 0)
 	for _, device := range m.sensors {
 		m.logger.Debugf("Getting stats for %s", device.Name)
 		stat, err := device.GetSensorReading(ctx)
@@ -231,7 +231,7 @@ func (m *jetsonGpuMonitor) GetGPUStats(ctx context.Context) ([]*gpuSensorReading
 			m.logger.Errorf("Failed to get sensor reading for %s: %v", device.Name, err)
 			continue
 		}
-		stats = append(stats, stat)
+		stats = append(stats, *stat)
 	}
 	return stats, nil
 }

@@ -103,7 +103,7 @@ func calculateCollectionSize(sleepTime time.Duration) int {
 func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	m := make(map[string][]*gpuSensorReading)
+	m := make(map[string][]gpuSensorReading)
 	for _, sample := range c.stats.Items() {
 		for _, stats := range sample.DeviceStats {
 			m[stats.Name] = append(m[stats.Name], stats)
@@ -171,5 +171,5 @@ func (c *Config) captureGPUStats() {
 }
 
 type sample struct {
-	DeviceStats []*gpuSensorReading
+	DeviceStats []gpuSensorReading
 }

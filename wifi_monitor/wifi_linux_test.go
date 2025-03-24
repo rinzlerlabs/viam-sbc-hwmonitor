@@ -23,7 +23,7 @@ func TestLinuxProcWifiMonitor(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			w := &linuxProcWifiMonitor{adapter: tt.adapter}
+			w := &procWifiMonitor{adapter: tt.adapter}
 			status, err := w.parseNetworkStatus(string(output))
 			if tt.expectedError != nil {
 				assert.Equal(t, tt.expectedError, err)
@@ -31,7 +31,7 @@ func TestLinuxProcWifiMonitor(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 				assert.Equal(t, tt.signalStrength, status.SignalStrength)
-				assert.Equal(t, tt.linkSpeed, status.LinkSpeedMbps)
+				assert.Equal(t, tt.linkSpeed, status.TxSpeedMbps)
 			}
 		})
 	}
@@ -54,7 +54,7 @@ func TestLinuxIwWifiMonitor(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			output, err := os.ReadFile(fmt.Sprintf("testdata/%v", tt.file))
 			assert.NoError(t, err)
-			w := &linuxIwWifiMonitor{adapter: tt.adapter}
+			w := &iwWifiMonitor{adapter: tt.adapter}
 			status, err := w.parseNetworkStatus(string(output))
 			if tt.expectedError != nil {
 				assert.Equal(t, tt.expectedError, err)
@@ -62,7 +62,7 @@ func TestLinuxIwWifiMonitor(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 				assert.Equal(t, tt.signalStrength, status.SignalStrength)
-				assert.Equal(t, tt.linkSpeed, status.LinkSpeedMbps)
+				assert.Equal(t, tt.linkSpeed, status.TxSpeedMbps)
 			}
 		})
 	}
@@ -84,7 +84,7 @@ func TestLinuxNmcliWifiMonitor(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			w := &linuxNmcliWifiMonitor{adapter: tt.adapter}
+			w := &nmcliWifiMonitor{adapter: tt.adapter}
 			status, err := w.parseNetworkStatus(string(output))
 			if tt.expectedError != nil {
 				assert.Equal(t, tt.expectedError, err)
@@ -92,7 +92,7 @@ func TestLinuxNmcliWifiMonitor(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 				assert.Equal(t, tt.signalStrength, status.SignalStrength)
-				assert.Equal(t, tt.linkSpeed, status.LinkSpeedMbps)
+				assert.Equal(t, tt.linkSpeed, status.TxSpeedMbps)
 			}
 		})
 	}

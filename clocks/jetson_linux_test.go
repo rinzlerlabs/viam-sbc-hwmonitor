@@ -1,3 +1,6 @@
+//go:build linux
+// +build linux
+
 package clocks
 
 import (
@@ -8,13 +11,12 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"go.viam.com/rdk/logging"
-	// . "github.com/rinzlerlabs/sbcidentify/test"
 )
 
 func TestGetNvidiaClockSensorsReturnsAllSensors(t *testing.T) {
 	logger := logging.NewTestLogger(t)
 	ctx := context.Background()
-	clocks, err := getNvidiaClockSensors(ctx, logger)
+	clocks, err := getNvidiaJetsonClockSensors(ctx, logger)
 	assert.NoError(t, err)
 	assert.NotNil(t, clocks)
 	assert.Equal(t, runtime.NumCPU()+1, len(clocks))
@@ -23,9 +25,9 @@ func TestGetNvidiaClockSensorsReturnsAllSensors(t *testing.T) {
 		requiredKeys = append(requiredKeys, "cpu"+strconv.Itoa(i))
 	}
 	for i, clock := range clocks {
-		t.Logf("Clock %d: %v", i, clock.GetName())
+		t.Logf("Clock %d: %v", i, clock.Name())
 		for j, key := range requiredKeys {
-			if clock.GetName() == key {
+			if clock.Name() == key {
 				requiredKeys = append(requiredKeys[:j], requiredKeys[j+1:]...)
 				break
 			}

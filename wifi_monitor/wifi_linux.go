@@ -10,31 +10,31 @@ import (
 	"go.viam.com/rdk/logging"
 )
 
-func (c *Config) newLinuxWifiMonitor(adapter string) wifiMonitor {
+func (c *Config) newWifiMonitor(adapter string) WifiMonitor {
 	// iw has the best stats
 	if _, err := exec.LookPath("iw"); err == nil {
 		c.logger.Infof("Using iw for wifi stats")
-		return &linuxIwWifiMonitor{adapter: adapter, logger: c.logger}
+		return &iwWifiMonitor{adapter: adapter, logger: c.logger}
 	}
 	// nmcli has good stats
 	if _, err := exec.LookPath("nmcli"); err == nil {
 		c.logger.Infof("Using nmcli for wifi stats")
-		return &linuxNmcliWifiMonitor{adapter: adapter, logger: c.logger}
+		return &nmcliWifiMonitor{adapter: adapter, logger: c.logger}
 	}
 	// proc has basic stats
 	if _, err := os.Stat("/proc/net/wireless"); err == nil {
 		c.logger.Infof("Using /proc/net/wireless for wifi stats")
-		return &linuxProcWifiMonitor{adapter: adapter, logger: c.logger}
+		return &procWifiMonitor{adapter: adapter, logger: c.logger}
 	}
 	return nil
 }
 
-type linuxNmcliWifiMonitor struct {
+type nmcliWifiMonitor struct {
 	logger  logging.Logger
 	adapter string
 }
 
-func (w *linuxNmcliWifiMonitor) GetNetworkStatus() (*networkStatus, error) {
+func (w *nmcliWifiMonitor) GetNetworkStatus() (*networkStatus, error) {
 	cmd := exec.Command("nmcli", "-t", "-f", "ACTIVE,NAME,SSID,CHAN,FREQ,RATE,SIGNAL,DEVICE", "dev", "wifi")
 	out, err := cmd.Output()
 	if err != nil {
@@ -43,7 +43,7 @@ func (w *linuxNmcliWifiMonitor) GetNetworkStatus() (*networkStatus, error) {
 	return w.parseNetworkStatus(string(out))
 }
 
-func (w *linuxNmcliWifiMonitor) parseNetworkStatus(out string) (*networkStatus, error) {
+func (w *nmcliWifiMonitor) parseNetworkStatus(out string) (*networkStatus, error) {
 	adapterFound := false
 	lines := strings.Split(string(out), "\n")
 	for _, line := range lines {
@@ -69,7 +69,7 @@ func (w *linuxNmcliWifiMonitor) parseNetworkStatus(out string) (*networkStatus, 
 			return &networkStatus{
 				NetworkName:    col[2],
 				SignalStrength: -1 * signalStrength,
-				LinkSpeedMbps:  linkSpeed,
+				TxSpeedMbps:    linkSpeed,
 			}, e
 		}
 	}
@@ -80,12 +80,12 @@ func (w *linuxNmcliWifiMonitor) parseNetworkStatus(out string) (*networkStatus, 
 	}
 }
 
-type linuxIwWifiMonitor struct {
+type iwWifiMonitor struct {
 	logger  logging.Logger
 	adapter string
 }
 
-func (w *linuxIwWifiMonitor) GetNetworkStatus() (*networkStatus, error) {
+func (w *iwWifiMonitor) GetNetworkStatus() (*networkStatus, error) {
 	cmd := exec.Command("iw", "dev", w.adapter, "link")
 	out, err := cmd.Output()
 	if err != nil {
@@ -98,7 +98,7 @@ func (w *linuxIwWifiMonitor) GetNetworkStatus() (*networkStatus, error) {
 	return w.parseNetworkStatus(string(out))
 }
 
-func (w *linuxIwWifiMonitor) parseNetworkStatus(out string) (*networkStatus, error) {
+func (w *iwWifiMonitor) parseNetworkStatus(out string) (*networkStatus, error) {
 	var e error = nil
 	if strings.Contains(string(out), "Not connected") {
 		return nil, ErrNotConnected
@@ -128,19 +128,19 @@ func (w *linuxIwWifiMonitor) parseNetworkStatus(out string) (*networkStatus, err
 				linkSpeed = -1
 				e = errors.Join(e, err)
 			}
-			status.LinkSpeedMbps = linkSpeed
+			status.TxSpeedMbps = linkSpeed
 		}
 	}
 
 	return status, e
 }
 
-type linuxProcWifiMonitor struct {
+type procWifiMonitor struct {
 	logger  logging.Logger
 	adapter string
 }
 
-func (w *linuxProcWifiMonitor) GetNetworkStatus() (*networkStatus, error) {
+func (w *procWifiMonitor) GetNetworkStatus() (*networkStatus, error) {
 	out, err := os.ReadFile("/proc/net/wireless")
 	if err != nil {
 		return nil, err
@@ -148,7 +148,7 @@ func (w *linuxProcWifiMonitor) GetNetworkStatus() (*networkStatus, error) {
 	return w.parseNetworkStatus(string(out))
 }
 
-func (w *linuxProcWifiMonitor) parseNetworkStatus(out string) (*networkStatus, error) {
+func (w *procWifiMonitor) parseNetworkStatus(out string) (*networkStatus, error) {
 	lines := strings.Split(out, "\n")
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
@@ -165,7 +165,7 @@ func (w *linuxProcWifiMonitor) parseNetworkStatus(out string) (*networkStatus, e
 			return &networkStatus{
 				NetworkName:    "unknown",
 				SignalStrength: signalStrength,
-				LinkSpeedMbps:  linkSpeed,
+				TxSpeedMbps:    linkSpeed,
 			}, nil
 		}
 	}

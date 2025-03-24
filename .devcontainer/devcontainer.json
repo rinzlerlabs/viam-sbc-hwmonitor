@@ -12,7 +12,8 @@
         }
     },
     "mounts": [
-      "source=${localWorkspaceFolder},target=/workspace,type=bind"
+      "source=${localWorkspaceFolder},target=/workspace,type=bind",
+      "source=${env:HOME}/.viam,target=/home/user/.viam,type=bind"
     ],
     "workspaceFolder": "/workspace"
   }

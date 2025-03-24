@@ -4,5 +4,5 @@ type clockSensor interface {
 	StartUpdating() error
 	Close()
 	GetReadingMap() map[string]interface{}
-	GetName() string
+	Name() string
 }

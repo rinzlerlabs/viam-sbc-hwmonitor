@@ -1,3 +1,6 @@
+//go:build linux
+// +build linux
+
 package clocks
 
 import (
@@ -25,9 +28,9 @@ func TestGetRaspPiClockSensorsReturnsAllSensors(t *testing.T) {
 		requiredKeys = append(requiredKeys, "cpu"+strconv.Itoa(i))
 	}
 	for i, clock := range clocks {
-		t.Logf("Clock %d: %v", i, clock.GetName())
+		t.Logf("Clock %d: %v", i, clock.Name())
 		for j, key := range requiredKeys {
-			if clock.GetName() == key {
+			if clock.Name() == key {
 				requiredKeys = append(requiredKeys[:j], requiredKeys[j+1:]...)
 				break
 			}

@@ -1,3 +1,6 @@
+//go:build linux
+// +build linux
+
 package clocks
 
 import (
@@ -11,7 +14,7 @@ import (
 	"go.viam.com/rdk/logging"
 )
 
-type nvidiaClockSensor struct {
+type jetsonClockSensor struct {
 	logger     logging.Logger
 	mu         sync.RWMutex
 	wg         sync.WaitGroup
@@ -24,16 +27,16 @@ type nvidiaClockSensor struct {
 	path       string
 }
 
-func (s *nvidiaClockSensor) Close() {
+func (s *jetsonClockSensor) Close() {
 	s.cancelFunc()
 	s.wg.Wait()
 }
 
-func (s *nvidiaClockSensor) GetName() string {
+func (s *jetsonClockSensor) Name() string {
 	return s.name
 }
 
-func (s *nvidiaClockSensor) GetReadingMap() map[string]interface{} {
+func (s *jetsonClockSensor) GetReadingMap() map[string]interface{} {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return map[string]interface{}{
@@ -41,7 +44,7 @@ func (s *nvidiaClockSensor) GetReadingMap() map[string]interface{} {
 	}
 }
 
-func (s *nvidiaClockSensor) StartUpdating() error {
+func (s *jetsonClockSensor) StartUpdating() error {
 	updateInterval := 1 * time.Second
 	s.updateTask = func() {
 		s.wg.Add(1)
@@ -73,7 +76,7 @@ func (s *nvidiaClockSensor) StartUpdating() error {
 	return nil
 }
 
-func (s *nvidiaClockSensor) readSysfsClock() (int64, error) {
+func (s *jetsonClockSensor) readSysfsClock() (int64, error) {
 	current, err := getSysFsClock(s.cancelCtx, s.path)
 	if err != nil {
 		s.logger.Errorw("failed to read sysfs clock", "sensor", s.name, "error", err)
@@ -83,12 +86,12 @@ func (s *nvidiaClockSensor) readSysfsClock() (int64, error) {
 	return current, nil
 }
 
-func newNvidiaCpuClockSensor(ctx context.Context, logger logging.Logger, path string) *nvidiaClockSensor {
-	logger.Debugf("Initializing NVIDIA CPU clock sensor: %v", path)
+func newNvidiaJetsonCpuClockSensor(ctx context.Context, logger logging.Logger, path string) *jetsonClockSensor {
+	logger.Debugf("Initializing NVIDIA Jetson CPU clock sensor: %v", path)
 	cancelCtx, cancelFunc := context.WithCancel(ctx)
 	parts := strings.Split(path, "/")
 	sensorName := parts[len(parts)-1]
-	s := &nvidiaClockSensor{
+	s := &jetsonClockSensor{
 		logger:     logger.Sublogger(sensorName),
 		name:       sensorName,
 		cancelCtx:  cancelCtx,
@@ -99,8 +102,8 @@ func newNvidiaCpuClockSensor(ctx context.Context, logger logging.Logger, path st
 	return s
 }
 
-func newNvidiaGpuClockSensor(ctx context.Context, logger logging.Logger) *nvidiaClockSensor {
-	logger.Debug("Initializing NVIDIA GPU clock sensor")
+func newNvidiaJetsonGpuClockSensor(ctx context.Context, logger logging.Logger) *jetsonClockSensor {
+	logger.Debug("Initializing NVIDIA Jetson GPU clock sensor")
 	paths := []string{
 		"/sys/devices/platform/bus@0/17000000.gpu/devfreq/17000000.gpu/cur_freq",
 		"/sys/devices/platform/17000000.ga10b/devfreq/17000000.ga10b/cur_freq",
@@ -115,7 +118,7 @@ func newNvidiaGpuClockSensor(ctx context.Context, logger logging.Logger) *nvidia
 	}
 	cancelCtx, cancelFunc := context.WithCancel(ctx)
 	name := "gpu0"
-	return &nvidiaClockSensor{
+	return &jetsonClockSensor{
 		logger:     logger.Sublogger(name),
 		name:       name,
 		cancelCtx:  cancelCtx,
@@ -125,16 +128,16 @@ func newNvidiaGpuClockSensor(ctx context.Context, logger logging.Logger) *nvidia
 	}
 }
 
-func getNvidiaClockSensors(ctx context.Context, logger logging.Logger) ([]clockSensor, error) {
+func getNvidiaJetsonClockSensors(ctx context.Context, logger logging.Logger) ([]clockSensor, error) {
 	sensors := make([]clockSensor, 0)
 	sysFsCpus, err := getSysFsCpuPaths()
 	if err != nil {
 		return nil, err
 	}
 	for _, cpu := range sysFsCpus {
-		sensor := newNvidiaCpuClockSensor(ctx, logger, cpu)
+		sensor := newNvidiaJetsonCpuClockSensor(ctx, logger, cpu)
 		sensors = append(sensors, sensor)
 	}
-	sensors = append(sensors, newNvidiaGpuClockSensor(ctx, logger))
+	sensors = append(sensors, newNvidiaJetsonGpuClockSensor(ctx, logger))
 	return sensors, nil
 }

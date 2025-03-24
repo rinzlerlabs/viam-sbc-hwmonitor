@@ -3,7 +3,6 @@ package wifi_monitor
 import (
 	"context"
 	"errors"
-	"runtime"
 	"sync"
 
 	"go.viam.com/rdk/components/sensor"
@@ -27,7 +26,7 @@ type Config struct {
 	logger      logging.Logger
 	cancelCtx   context.Context
 	cancelFunc  func()
-	wifiMonitor wifiMonitor
+	wifiMonitor WifiMonitor
 }
 
 func init() {
@@ -69,19 +68,11 @@ func (c *Config) Reconfigure(ctx context.Context, _ resource.Dependencies, conf 
 	// In case the module has changed name
 	c.Named = conf.ResourceName().AsNamed()
 
-	if runtime.GOOS == "linux" {
-		mon := c.newLinuxWifiMonitor(newConf.Adapter)
-		if mon == nil {
-			return errors.New("no suitable wifi monitor found")
-		}
-		c.wifiMonitor = mon
-	} else if runtime.GOOS == "darwin" {
-		c.wifiMonitor = &macOsWifiMonitor{}
-	} else if runtime.GOOS == "windows" {
-		c.wifiMonitor = &windowsWifiMonitor{}
-	} else {
-		c.wifiMonitor = nil
+	mon := c.newWifiMonitor(newConf.Adapter)
+	if mon == nil {
+		return errors.New("no suitable wifi monitor found")
 	}
+	c.wifiMonitor = mon
 
 	return nil
 }
@@ -102,7 +93,7 @@ func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (ma
 		} else {
 			ret["network"] = status.NetworkName
 			ret["signal_strength"] = status.SignalStrength
-			ret["link_speed_mbps"] = status.LinkSpeedMbps
+			ret["link_speed_mbps"] = status.TxSpeedMbps
 		}
 	} else {
 		ret["network"] = "unknown"

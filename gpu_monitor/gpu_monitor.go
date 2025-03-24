@@ -3,45 +3,46 @@ package gpu_monitor
 import (
 	"context"
 	"errors"
-
-	"github.com/rinzlerlabs/sbcidentify"
-	"github.com/rinzlerlabs/sbcidentify/boardtype"
-	"go.viam.com/rdk/logging"
 )
 
 var (
 	ErrUnsupportedBoard = errors.New("gpu stats not supported on this board")
 )
 
+type gpuSensorType string
+
+const (
+	// GPU sensor types
+	GPUSensorTypePower     gpuSensorType = "power"
+	GPUSensorTypeFrequency gpuSensorType = "frequency"
+	GPUSensorTypeLoad      gpuSensorType = "load"
+	GPUSensorTypeMemory    gpuSensorType = "memory"
+)
+
+type gpuSensor interface {
+	GetSensorReading(context.Context) (*gpuSensorReading, error)
+	Name() string
+}
+
 type gpuMonitor interface {
-	GetGPUStats(ctx context.Context) ([]gpuDeviceStats, error)
-	Close()
+	Close() error
+	GetGPUStats(context.Context) ([]*gpuSensorReading, error)
 }
 
-func newGpuMonitor(ctx context.Context, logger logging.Logger) (gpuMonitor, error) {
-	if sbcidentify.IsBoardType(boardtype.NVIDIA) {
-		return newNvidiaGpuMonitor(ctx, logger)
-	}
-	return nil, ErrUnsupportedBoard
+type gpuSensorReading struct {
+	Name         string
+	Type         gpuSensorType
+	CurrentValue int64
+	MaxValue     int64
+	MinValue     int64
 }
 
-type gpuDeviceStats struct {
-	Name             string
-	CurrentFrequency int64
-	MaxFrequency     int64
-	MinFrequency     int64
-	Governor         string
-	Load             float64
-}
-
-func gpuDeviceStatsToMap(stats []gpuDeviceStats) map[string]interface{} {
+func gpuDeviceStatsToMap(stats []gpuSensorReading) map[string]interface{} {
 	result := make(map[string]interface{})
 	for _, stat := range stats {
-		result[stat.Name+"-current_frequency"] = stat.CurrentFrequency
-		result[stat.Name+"-max_frequency"] = stat.MaxFrequency
-		result[stat.Name+"-min_frequency"] = stat.MinFrequency
-		result[stat.Name+"-governor"] = stat.Governor
-		result[stat.Name+"-load"] = stat.Load
+		result[stat.Name+"-current_value"] = stat.CurrentValue
+		result[stat.Name+"-max_value"] = stat.MaxValue
+		result[stat.Name+"-min_value"] = stat.MinValue
 	}
 	return result
 }

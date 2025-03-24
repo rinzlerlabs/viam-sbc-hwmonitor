@@ -1,6 +1,12 @@
-FROM golang:1.23-alpine
+FROM golang:1.23-bookworm
 
-RUN apk add --no-cache bash git make curl openssh
+RUN sed -i 's/^Components: main$/& contrib non-free non-free-firmware/' /etc/apt/sources.list.d/debian.sources
+RUN apt update && apt install -y \
+    build-essential \
+    git \
+    curl \
+    ssh \
+    libnvidia-ml-dev
 
 # Install Viam RDK CLI
 RUN ARCH=$(go env GOARCH) && \
@@ -8,11 +14,11 @@ RUN ARCH=$(go env GOARCH) && \
     chmod a+rx /usr/local/bin/viam
 
 ENV PATH=/usr/local/go/bin:${PATH}
-ARG USERNAME=vscode
-ARG USER_UID=1000
-ARG USER_GID=1000
-RUN addgroup -g ${USER_GID} ${USERNAME} \
-    && adduser -u ${USER_UID} -G ${USERNAME} -s /bin/bash -D ${USERNAME}
+RUN groupadd -g 1000 user
+RUN useradd -u 1000 -g 1000 -m -s /bin/bash user
+RUN usermod -aG sudo user
+RUN echo "user ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+RUN cat /etc/passwd
 
 WORKDIR /workspace
 USER ${USERNAME}

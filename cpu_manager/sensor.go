@@ -1,3 +1,6 @@
+//go:build linux
+// +build linux
+
 package cpu_manager
 
 import (
@@ -71,6 +74,7 @@ func (c *Config) Reconfigure(ctx context.Context, _ resource.Dependencies, conf 
 
 	// In case the module has changed name
 	c.Named = conf.ResourceName().AsNamed()
+
 	if !sbcidentify.IsRaspberryPi() {
 		c.logger.Errorf("This sensor is only supported on Raspberry Pi")
 		return utils.ErrBoardNotSupported

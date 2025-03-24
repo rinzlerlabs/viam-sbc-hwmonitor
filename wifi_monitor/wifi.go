@@ -8,12 +8,13 @@ var (
 	ErrNoAdaptersFound = errors.New("no adapters found")
 )
 
-type wifiMonitor interface {
+type WifiMonitor interface {
 	GetNetworkStatus() (*networkStatus, error)
 }
 
 type networkStatus struct {
 	NetworkName    string
 	SignalStrength int
-	LinkSpeedMbps  float64
+	TxSpeedMbps    float64
+	RxSpeedMbps    float64
 }

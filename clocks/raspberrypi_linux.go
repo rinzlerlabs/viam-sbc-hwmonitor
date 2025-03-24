@@ -1,3 +1,6 @@
+//go:build linux
+// +build linux
+
 package clocks
 
 import (
@@ -131,7 +134,7 @@ func (s *raspberryPiClockSensor) GetReadingMap() map[string]interface{} {
 	}
 }
 
-func (s *raspberryPiClockSensor) GetName() string {
+func (s *raspberryPiClockSensor) Name() string {
 	return s.name
 }
 

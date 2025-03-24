@@ -1,216 +1,366 @@
+//go:build full_nvidia_support
+// +build full_nvidia_support
+
 package gpu_monitor
 
 import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
-	"strings"
 
+	"github.com/NVIDIA/go-nvml/pkg/nvml"
 	"github.com/rinzlerlabs/viam-raspi-sensors/utils"
 	"go.viam.com/rdk/logging"
 )
 
 var (
-	ErrDevicePathNotFound = errors.New("device path not found")
-	ErrStatsNotAvailable  = errors.New("stats not available for this device")
-	searchPaths           = []string{
-		"/sys/devices/platform/bus@0/",
-		"/sys/devices/platform/",
+	errUnsupportedSensorType = errors.New("unsupported sensor type")
+	clockTypes               = map[string]nvml.ClockType{
+		"graphics": nvml.CLOCK_GRAPHICS,
+		"sm":       nvml.CLOCK_SM,
+		"mem":      nvml.CLOCK_MEM,
+		"video":    nvml.CLOCK_VIDEO,
+		"count":    nvml.CLOCK_COUNT,
 	}
 
-	frequencyBasePath     = "/sys/class/devfreq/"
-	nvidiaDevicePostfixes = []string{"gpu", "ga10b", "gp10b", "vic", "nvjpg", "nvdec", "ofa"}
-	statsEnabledPostfixes = []string{"gpu", "ga10b", "gp10b"}
-	deviceCounts          = make(map[string]int)
+	nvidiaLoadSensors   = []string{"encoder", "decoder", "jpg", "ofa"}                     // Sensors that report load (utilization) values
+	nvidiaPowerSensors  = []string{"power", "power_limit", "default_limit", "power_state"} // Sensors that report power values
+	nvidiaMemorySensors = []string{"mem", "graphics", "sm", "video"}                       // Sensors that report memory values
 )
 
-func getStatsPath(name string) (string, error) {
-	isStatsEnabled := false
-	for _, postfix := range statsEnabledPostfixes {
-		if strings.Contains(name, postfix) {
-			isStatsEnabled = true
+func hasNVIDIAGPU() bool {
+	err := utils.NVMLManager.Acquire()
+	defer utils.NVMLManager.Release()
+	return err == nil
+}
+
+func newNVIDIAGpuMonitor(logger logging.Logger) (gpuMonitor, error) {
+	ret := utils.NVMLManager.Acquire()
+	if ret != nil {
+		logger.Errorf("Failed to acquire NVML: %v", ret)
+		return nil, ret
+	}
+	gpus := make([]*nvidiaGpu, 0)
+	deviceCount, ret := nvml.DeviceGetCount()
+	if ret != nvml.SUCCESS {
+		logger.Errorf("Failed to get device count: %v", ret)
+		return nil, ret
+	}
+	for i := range deviceCount {
+		gpu, err := newNvidiaGpu(logger, i)
+		if err != nil {
+			logger.Errorf("Failed to create GPU %d: %v", i, err)
+			continue
 		}
+		gpus = append(gpus, gpu)
 	}
-	if !isStatsEnabled {
-		return "", nil
-	}
-	for _, path := range searchPaths {
-		devicePath := filepath.Join(path, name)
-		if _, err := os.Stat(devicePath); err == nil {
-			return devicePath, nil
-		}
-	}
-	return "", ErrDevicePathNotFound
-}
-
-func newNvidiaGpuDevice(ctx context.Context, fullname string) (*nvidiaGpuDevice, error) {
-	prettyName := fullname
-	parts := strings.Split(fullname, ".")
-	if len(parts) > 1 {
-		prettyName = parts[1]
-	}
-	statsPath, err := getStatsPath(fullname)
-	if err != nil {
-		return nil, err
-	}
-	device := &nvidiaGpuDevice{
-		Name:          fullname,
-		PrettyName:    prettyName,
-		FrequencyPath: filepath.Join(frequencyBasePath, fullname),
-		StatsPath:     statsPath,
-	}
-	return device, nil
-}
-
-type nvidiaGpuDevice struct {
-	Name          string
-	PrettyName    string
-	FrequencyPath string
-	StatsPath     string
-	minFrequency  *int64
-	maxFrequency  *int64
-}
-
-func (d *nvidiaGpuDevice) GetCurrentFrequency(ctx context.Context) (int64, error) {
-	freqPath := filepath.Join(d.FrequencyPath, "cur_freq")
-	return utils.ReadInt64FromFileWithContext(ctx, freqPath)
-}
-
-func (d *nvidiaGpuDevice) GetMaxFrequency(ctx context.Context) (int64, error) {
-	if d.maxFrequency != nil {
-		return *d.maxFrequency, nil
-	}
-	freqPath := filepath.Join(d.FrequencyPath, "max_freq")
-	freq, err := utils.ReadInt64FromFileWithContext(ctx, freqPath)
-	if err != nil {
-		return 0, err
-	}
-	// cache the value for the future
-	d.maxFrequency = &freq
-	return freq, nil
-}
-
-func (d *nvidiaGpuDevice) GetMinFrequency(ctx context.Context) (int64, error) {
-	if d.minFrequency != nil {
-		return *d.minFrequency, nil
-	}
-	freqPath := filepath.Join(d.FrequencyPath, "min_freq")
-	freq, err := utils.ReadInt64FromFileWithContext(ctx, freqPath)
-	if err != nil {
-		return 0, err
-	}
-	// cache the value for the future
-	d.minFrequency = &freq
-	return freq, nil
-}
-
-func (d *nvidiaGpuDevice) GetGovernor(ctx context.Context) (string, error) {
-	govPath := filepath.Join(d.FrequencyPath, "governor")
-	return utils.ReadFileWithContext(ctx, govPath)
-}
-
-func (d *nvidiaGpuDevice) GetLoad(ctx context.Context) (float64, error) {
-	if d.StatsPath == "" {
-		return 0, ErrStatsNotAvailable
-	}
-	loadPath := filepath.Join(d.StatsPath, "load")
-	load, err := utils.ReadInt64FromFileWithContext(ctx, loadPath)
-	return float64(load), err
+	return &nvidiaGpuMonitor{logger: logger, gpus: gpus}, nil
 }
 
 type nvidiaGpuMonitor struct {
-	logger  logging.Logger
-	devices []*nvidiaGpuDevice
+	logger logging.Logger
+	gpus   []*nvidiaGpu
 }
 
-func newNvidiaGpuMonitor(ctx context.Context, logger logging.Logger) (gpuMonitor, error) {
-	devices := make([]*nvidiaGpuDevice, 0)
-	dirs, err := os.ReadDir(frequencyBasePath)
-	if err != nil {
-		return nil, err
-	}
-	for _, dir := range dirs {
-		name := dir.Name()
-		isValidDevice := false
-		for _, postfix := range nvidiaDevicePostfixes {
-			if strings.Contains(name, postfix) {
-				isValidDevice = true
-			}
-		}
-		if !isValidDevice {
-			continue
-		}
-
-		realPath, err := filepath.EvalSymlinks(filepath.Join(frequencyBasePath, name))
-		if err != nil {
-			return nil, err
-		}
-		dirInfo, err := os.Stat(realPath)
-		if err != nil {
-			return nil, err
-		}
-		if !dirInfo.IsDir() {
-			continue
-		}
-		logger.Infof("Found GPU Device %s", name)
-		device, err := newNvidiaGpuDevice(ctx, name)
-		if err != nil {
-			return nil, err
-		}
-		if _, ok := deviceCounts[device.PrettyName]; !ok {
-			deviceCounts[device.PrettyName] = 0
-
-		} else {
-			deviceCounts[device.PrettyName]++
-		}
-		device.PrettyName = fmt.Sprintf("%s%d", device.PrettyName, deviceCounts[device.PrettyName])
-		for _, dev := range devices {
-			if dev.PrettyName == device.PrettyName {
-				device.PrettyName = device.PrettyName + "2"
-			}
-		}
-		devices = append(devices, device)
-	}
-	return &nvidiaGpuMonitor{logger: logger, devices: devices}, nil
+func (n *nvidiaGpuMonitor) Close() error {
+	return utils.NVMLManager.Release()
 }
 
-func (m *nvidiaGpuMonitor) GetGPUStats(ctx context.Context) ([]gpuDeviceStats, error) {
-	stats := make([]gpuDeviceStats, 0)
-	for _, device := range m.devices {
-		m.logger.Debugf("Getting stats for %s", device.Name)
-		curFreq, err := device.GetCurrentFrequency(ctx)
-		if err != nil {
-			return nil, err
+func (n *nvidiaGpuMonitor) GetGPUStats(ctx context.Context) ([]*gpuSensorReading, error) {
+	stats := make([]*gpuSensorReading, 0)
+	for _, gpu := range n.gpus {
+		for _, sensor := range gpu.sensors {
+			stat, err := sensor.GetSensorReading(ctx)
+			if err != nil {
+				n.logger.Errorf("Failed to get sensor reading for %s: %v", sensor.Name(), err)
+				continue
+			}
+			stats = append(stats, stat)
 		}
-		maxFreq, err := device.GetMaxFrequency(ctx)
-		if err != nil {
-			return nil, err
-		}
-		minFreq, err := device.GetMinFrequency(ctx)
-		if err != nil {
-			return nil, err
-		}
-		gov, err := device.GetGovernor(ctx)
-		if err != nil {
-			return nil, err
-		}
-		load, err := device.GetLoad(ctx)
-		if err != nil && err != ErrStatsNotAvailable {
-			return nil, err
-		}
-		stats = append(stats, gpuDeviceStats{
-			Name:             device.PrettyName,
-			CurrentFrequency: curFreq,
-			MaxFrequency:     maxFreq,
-			MinFrequency:     minFreq,
-			Governor:         gov,
-			Load:             load,
-		})
 	}
 	return stats, nil
 }
 
-func (m *nvidiaGpuMonitor) Close() {
+func newNvidiaGpu(logger logging.Logger, index int) (*nvidiaGpu, error) {
+	nvmlDevice, ret := nvml.DeviceGetHandleByIndex(index)
+	if ret != nvml.SUCCESS {
+		logger.Errorf("Failed to get device handle for index %d: %v", index, ret)
+		return nil, errors.Join(ret, fmt.Errorf("failed to get device handle for GPU %d", index))
+	}
+	name, ret := nvmlDevice.GetName()
+	if ret != nvml.SUCCESS {
+		logger.Errorf("Failed to get device name for index %d: %v", index, ret)
+		return nil, errors.Join(ret, fmt.Errorf("failed to get device name for GPU %d", index))
+	}
+	sensors := make([]gpuSensor, 0)
+	for name, clockType := range clockTypes { // Iterate over default clocks, not all clocks are supported so we check each one
+		_, ret := nvmlDevice.GetClockInfo(clockType) // Current clocks
+		if ret != nvml.SUCCESS {
+			logger.Warnf("Failed to get clock info for device %s: %v", name, ret)
+			continue
+		}
+		maxFreq, ret := nvmlDevice.GetMaxClockInfo(clockType) // Max clocks
+		if ret != nvml.SUCCESS {
+			logger.Warnf("Failed to get max clock info for device %s: %v", name, ret)
+			continue
+		}
+		sensors = append(sensors, &nvidiaGpuClock{
+			name:         name, // TODO: Tweak this name...
+			clockType:    clockType,
+			maxFrequency: maxFreq,
+		})
+	}
+
+	for _, loadSensor := range nvidiaLoadSensors {
+		if s, err := newNvidiaGpuSensor(loadSensor, nvmlDevice, GPUSensorTypeLoad); err == nil {
+			sensors = append(sensors, s)
+		} else {
+			logger.Errorf("Failed to create %s sensor for device %s: %v", loadSensor, name, err)
+		}
+	}
+	for _, powerSensor := range nvidiaPowerSensors {
+		if s, err := newNvidiaGpuSensor(powerSensor, nvmlDevice, GPUSensorTypePower); err == nil {
+			sensors = append(sensors, s)
+		} else {
+			logger.Errorf("Failed to create %s sensor for device %s: %v", powerSensor, name, err)
+		}
+	}
+	for _, memorySensor := range nvidiaMemorySensors {
+		if s, err := newNvidiaGpuSensor(memorySensor, nvmlDevice, GPUSensorTypeMemory); err == nil {
+			sensors = append(sensors, s)
+		} else {
+			logger.Errorf("Failed to create %s sensor for device %s: %v", memorySensor, name, err)
+		}
+	}
+	return &nvidiaGpu{
+		logger:  logger,
+		name:    name,
+		index:   index,
+		sensors: sensors,
+	}, nil
+}
+
+type nvidiaGpu struct {
+	logger  logging.Logger
+	name    string
+	index   int
+	sensors []gpuSensor
+}
+
+func (d *nvidiaGpu) GetName() string {
+	return d.name
+}
+
+func (d *nvidiaGpu) Close() error {
+	ret := nvml.Shutdown()
+	if ret != nvml.SUCCESS {
+		return ret
+	}
+	return nil
+}
+
+type nvidiaGpuClock struct {
+	name         string
+	clockType    nvml.ClockType
+	nvmlDevice   nvml.Device
+	maxFrequency uint32
+}
+
+func (s *nvidiaGpuClock) Name() string {
+	return s.name
+}
+
+func (s *nvidiaGpuClock) GetSensorReading(context.Context) (*gpuSensorReading, error) {
+	reading := &gpuSensorReading{
+		Name: s.name,
+		Type: GPUSensorTypeFrequency,
+	}
+	if s.HasMinValue() {
+		minFreq, err := s.MinValue()
+		if err != nil {
+			return nil, err
+		}
+		reading.MinValue = int64(minFreq)
+	}
+	if s.HasMaxValue() {
+		maxFreq, err := s.MaxValue()
+		if err != nil {
+			return nil, err
+		}
+		reading.MaxValue = int64(maxFreq)
+	}
+	if s.HasCurrentValue() {
+		curFreq, err := s.CurrentValue()
+		if err != nil {
+			return nil, err
+		}
+		reading.CurrentValue = int64(curFreq)
+	}
+	return reading, nil
+}
+
+func (s *nvidiaGpuClock) HasMinValue() bool {
+	return false
+}
+
+func (s *nvidiaGpuClock) MinValue() (float64, error) {
+	return 0, nil
+}
+
+func (s *nvidiaGpuClock) HasMaxValue() bool {
+	return true
+}
+
+func (s *nvidiaGpuClock) MaxValue() (float64, error) {
+	return float64(s.maxFrequency), nil
+}
+
+func (s *nvidiaGpuClock) HasCurrentValue() bool {
+	return true
+}
+
+func (s *nvidiaGpuClock) CurrentValue() (float64, error) {
+	if !s.HasCurrentValue() {
+		return 0, errors.New("current value not supported for this sensor")
+	}
+	frequency, ret := s.nvmlDevice.GetClockInfo(s.clockType)
+	if ret != nvml.SUCCESS {
+		return 0, errors.Join(ret, fmt.Errorf("failed to get current clock frequency for %s", s.name))
+	}
+	return float64(frequency), nil
+}
+
+func newNvidiaGpuSensor(name string, nvmlDevice nvml.Device, sensorType gpuSensorType) (*nvidiaGpuSensor, error) {
+	if _, err := getReading(sensorType, name, nvmlDevice); err != nil {
+		return nil, err
+	}
+	return &nvidiaGpuSensor{
+		name:       name,
+		sensorType: sensorType,
+		nvmlDevice: nvmlDevice,
+	}, nil
+}
+
+type nvidiaGpuSensor struct {
+	name       string
+	sensorType gpuSensorType
+	nvmlDevice nvml.Device
+	sensor     string
+}
+
+func (s *nvidiaGpuSensor) Name() string {
+	return s.name
+}
+
+func (s *nvidiaGpuSensor) GetSensorReading(context.Context) (*gpuSensorReading, error) {
+	reading := &gpuSensorReading{
+		Name: s.name,
+		Type: GPUSensorTypeFrequency,
+	}
+	if s.HasMinValue() {
+		minFreq, err := s.MinValue()
+		if err != nil {
+			return nil, err
+		}
+		reading.MinValue = int64(minFreq)
+	}
+	if s.HasMaxValue() {
+		maxFreq, err := s.MaxValue()
+		if err != nil {
+			return nil, err
+		}
+		reading.MaxValue = int64(maxFreq)
+	}
+	if s.HasCurrentValue() {
+		curFreq, err := s.CurrentValue()
+		if err != nil {
+			return nil, err
+		}
+		reading.CurrentValue = int64(curFreq)
+	}
+	return reading, nil
+}
+
+func (s *nvidiaGpuSensor) HasMinValue() bool {
+	return false
+}
+
+func (s *nvidiaGpuSensor) MinValue() (float64, error) {
+	if !s.HasMinValue() {
+		return 0, errors.New("min value not supported for this sensor")
+	}
+	return 0, nil
+}
+
+func (s *nvidiaGpuSensor) HasMaxValue() bool {
+	return false
+}
+
+func (s *nvidiaGpuSensor) MaxValue() (float64, error) {
+	if !s.HasMaxValue() {
+		return 0, errors.New("max value not supported for this sensor")
+	}
+	return 0, nil
+}
+
+func (s *nvidiaGpuSensor) HasCurrentValue() bool {
+	return true
+}
+
+func (s *nvidiaGpuSensor) CurrentValue() (float64, error) {
+	if !s.HasCurrentValue() {
+		return 0, errors.New("current value not supported for this sensor")
+	}
+	vals, err := getReading(s.sensorType, s.sensor, s.nvmlDevice)
+	if err != nil {
+		return 0, err
+	}
+	if len(vals) == 0 {
+		return 0, errors.New("no values returned from sensor")
+	}
+	return float64(vals[0]), nil
+}
+
+func getReading(sensorType gpuSensorType, sensor string, nvmlDevice nvml.Device) ([]uint32, error) {
+	switch sensorType {
+	case GPUSensorTypePower:
+		switch sensor {
+		case "power":
+			val, ret := nvmlDevice.GetPowerUsage()
+			return []uint32{val}, ret
+		case "power_limit":
+			val, ret := nvmlDevice.GetPowerManagementLimit()
+			return []uint32{val}, ret
+		case "default_limit":
+			val, ret := nvmlDevice.GetPowerManagementDefaultLimit()
+			return []uint32{val}, ret
+		case "power_state":
+			val, ret := nvmlDevice.GetPowerState()
+			return []uint32{uint32(val)}, ret
+		default:
+			return nil, errUnsupportedSensorType
+		}
+	case GPUSensorTypeLoad:
+		switch sensor {
+		case "encoder":
+			val1, val2, ret := nvmlDevice.GetEncoderUtilization()
+			return []uint32{val1, val2}, ret
+		case "decoder":
+			val1, val2, ret := nvmlDevice.GetDecoderUtilization()
+			return []uint32{val1, val2}, ret
+		case "jpg":
+			val1, val2, ret := nvmlDevice.GetJpgUtilization()
+			return []uint32{val1, val2}, ret
+		case "ofa":
+			val1, val2, ret := nvmlDevice.GetOfaUtilization()
+			return []uint32{val1, val2}, ret
+
+		default:
+			return nil, errUnsupportedSensorType
+		}
+	case GPUSensorTypeFrequency:
+		panic("foo")
+	default:
+		return nil, fmt.Errorf("unsupported sensor type: %s", sensorType)
+	}
 }

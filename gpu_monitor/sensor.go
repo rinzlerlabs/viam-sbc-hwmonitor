@@ -103,7 +103,7 @@ func calculateCollectionSize(sleepTime time.Duration) int {
 func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	m := make(map[string][]gpuDeviceStats)
+	m := make(map[string][]*gpuSensorReading)
 	for _, sample := range c.stats.Items() {
 		for _, stats := range sample.DeviceStats {
 			m[stats.Name] = append(m[stats.Name], stats)
@@ -113,10 +113,9 @@ func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (ma
 	tmp := make(map[string]float64)
 	for name, stats := range m {
 		for _, stat := range stats {
-			tmp[fmt.Sprintf("%s-current_frequency", name)] += float64(stat.CurrentFrequency)
-			tmp[fmt.Sprintf("%s-max_frequency", name)] += float64(stat.MaxFrequency)
-			tmp[fmt.Sprintf("%s-min_frequency", name)] += float64(stat.MinFrequency)
-			tmp[fmt.Sprintf("%s-load", name)] += stat.Load
+			tmp[fmt.Sprintf("%s-current_frequency", name)] += float64(stat.CurrentValue)
+			tmp[fmt.Sprintf("%s-max_frequency", name)] += float64(stat.MaxValue)
+			tmp[fmt.Sprintf("%s-min_frequency", name)] += float64(stat.MinValue)
 		}
 		tmp[fmt.Sprintf("%s-current_frequency", name)] /= float64(len(stats))
 		tmp[fmt.Sprintf("%s-max_frequency", name)] /= float64(len(stats))
@@ -154,7 +153,6 @@ func (c *Config) captureGPUStats() {
 		c.logger.Warnf("Failed to initialize GPU monitor: %v", err)
 		return
 	}
-	defer gpuMonitor.Close()
 	c.logger.Debug("starting GPU stats main loop")
 	for {
 		select {
@@ -173,5 +171,5 @@ func (c *Config) captureGPUStats() {
 }
 
 type sample struct {
-	DeviceStats []gpuDeviceStats
+	DeviceStats []*gpuSensorReading
 }

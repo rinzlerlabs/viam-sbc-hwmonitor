@@ -9,34 +9,36 @@ import (
 	"go.viam.com/utils"
 
 	"github.com/rinzlerlabs/viam-raspi-sensors/clocks"
-	"github.com/rinzlerlabs/viam-raspi-sensors/cpu_manager"
-	"github.com/rinzlerlabs/viam-raspi-sensors/cpu_monitor"
-	"github.com/rinzlerlabs/viam-raspi-sensors/disk_monitor"
-	"github.com/rinzlerlabs/viam-raspi-sensors/gpu_monitor"
-	"github.com/rinzlerlabs/viam-raspi-sensors/memory_monitor"
-	"github.com/rinzlerlabs/viam-raspi-sensors/process_monitor"
-	"github.com/rinzlerlabs/viam-raspi-sensors/pwm_fan"
+	"github.com/rinzlerlabs/viam-raspi-sensors/cpumanager"
+	"github.com/rinzlerlabs/viam-raspi-sensors/cpumonitor"
+	"github.com/rinzlerlabs/viam-raspi-sensors/diskmonitor"
+	"github.com/rinzlerlabs/viam-raspi-sensors/gpumonitor"
+	"github.com/rinzlerlabs/viam-raspi-sensors/memorymonitor"
+	powermanager "github.com/rinzlerlabs/viam-raspi-sensors/powermanager"
+	"github.com/rinzlerlabs/viam-raspi-sensors/processmonitor"
+	"github.com/rinzlerlabs/viam-raspi-sensors/pwmfan"
 	"github.com/rinzlerlabs/viam-raspi-sensors/temperatures"
 	"github.com/rinzlerlabs/viam-raspi-sensors/throttling"
 	raspiutils "github.com/rinzlerlabs/viam-raspi-sensors/utils"
 	"github.com/rinzlerlabs/viam-raspi-sensors/voltages"
-	"github.com/rinzlerlabs/viam-raspi-sensors/wifi_monitor"
+	"github.com/rinzlerlabs/viam-raspi-sensors/wifimonitor"
 )
 
 func main() {
 	logger := module.NewLoggerFromArgs(raspiutils.LoggerName)
 	logger.Infof("Starting RinzlerLabs SBC Sensors Module %v", raspiutils.Version)
 	moduleutils.AddModularResource(clocks.API, clocks.Model)
-	moduleutils.AddModularResource(cpu_manager.API, cpu_manager.Model)
+	moduleutils.AddModularResource(cpumanager.API, cpumanager.Model)
 	moduleutils.AddModularResource(temperatures.API, temperatures.Model)
 	moduleutils.AddModularResource(throttling.API, throttling.Model)
 	moduleutils.AddModularResource(voltages.API, voltages.Model)
-	moduleutils.AddModularResource(pwm_fan.API, pwm_fan.Model)
-	moduleutils.AddModularResource(cpu_monitor.API, cpu_monitor.Model)
-	moduleutils.AddModularResource(gpu_monitor.API, gpu_monitor.Model)
-	moduleutils.AddModularResource(memory_monitor.API, memory_monitor.Model)
-	moduleutils.AddModularResource(process_monitor.API, process_monitor.Model)
-	moduleutils.AddModularResource(disk_monitor.API, disk_monitor.Model)
-	moduleutils.AddModularResource(wifi_monitor.API, wifi_monitor.Model)
+	moduleutils.AddModularResource(pwmfan.API, pwmfan.Model)
+	moduleutils.AddModularResource(cpumonitor.API, cpumonitor.Model)
+	moduleutils.AddModularResource(gpumonitor.API, gpumonitor.Model)
+	moduleutils.AddModularResource(memorymonitor.API, memorymonitor.Model)
+	moduleutils.AddModularResource(processmonitor.API, processmonitor.Model)
+	moduleutils.AddModularResource(diskmonitor.API, diskmonitor.Model)
+	moduleutils.AddModularResource(wifimonitor.API, wifimonitor.Model)
+	moduleutils.AddModularResource(powermanager.API, powermanager.Model)
 	utils.ContextualMain(moduleutils.RunModule, logger)
 }

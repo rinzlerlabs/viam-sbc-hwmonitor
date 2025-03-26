@@ -4,6 +4,7 @@ BIN_NAME := rinzlerlabs-sbc-hwmonitor
 ENTRY_POINT := module.go
 VERSION_PATH := utils/version.go
 PLATFORM := linux/arm64  # Default platform for single-platform targets
+BUILD_TAGS ?=
 
 BIN := $(BIN_PATH)/$(BIN_NAME)
 PACKAGE_DIR := package
@@ -30,7 +31,7 @@ build_$(subst /,_,$(1)):
 	@echo "Building $(BIN_NAME) for $(1)..."
 	@GOOS=$(word 1,$(subst /, ,$(1))) GOARCH=$(word 2,$(subst /, ,$(1))) \
 		CGO_ENABLED=1 \
-		go build -o $(BIN) $(ENTRY_POINT)
+		go build -tags=$(BUILD_TAGS) -o $(BIN) $(ENTRY_POINT)
 endef
 
 # === Package Template ===

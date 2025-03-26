@@ -1,7 +1,7 @@
 //go:build !full_nvidia_support
 // +build !full_nvidia_support
 
-package gpu_monitor
+package gpumonitor
 
 import (
 	"github.com/rinzlerlabs/sbcidentify"

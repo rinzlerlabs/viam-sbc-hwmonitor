@@ -9,7 +9,7 @@ import (
 	"fmt"
 
 	"github.com/NVIDIA/go-nvml/pkg/nvml"
-	"github.com/rinzlerlabs/viam-raspi-sensors/utils"
+	"github.com/rinzlerlabs/viam-sbc-hwmonitor/utils"
 	"go.viam.com/rdk/logging"
 )
 

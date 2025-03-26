@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rinzlerlabs/viam-raspi-sensors/utils"
+	"github.com/rinzlerlabs/viam-sbc-hwmonitor/utils"
 )
 
 type CPUCoreStats struct {

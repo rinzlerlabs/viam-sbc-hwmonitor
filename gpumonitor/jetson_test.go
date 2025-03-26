@@ -6,7 +6,7 @@ import (
 
 	"github.com/rinzlerlabs/sbcidentify/boardtype"
 	. "github.com/rinzlerlabs/sbcidentify/test"
-	"github.com/rinzlerlabs/viam-raspi-sensors/utils"
+	"github.com/rinzlerlabs/viam-sbc-hwmonitor/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.viam.com/rdk/logging"

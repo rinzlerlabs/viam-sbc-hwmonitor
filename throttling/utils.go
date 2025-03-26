@@ -11,7 +11,7 @@ import (
 
 	"github.com/rinzlerlabs/sbcidentify"
 	"github.com/rinzlerlabs/sbcidentify/boardtype"
-	"github.com/rinzlerlabs/viam-raspi-sensors/utils"
+	"github.com/rinzlerlabs/viam-sbc-hwmonitor/utils"
 )
 
 const (

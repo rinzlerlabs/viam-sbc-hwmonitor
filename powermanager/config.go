@@ -3,8 +3,8 @@ package powermanager
 import (
 	"github.com/rinzlerlabs/sbcidentify"
 	"github.com/rinzlerlabs/sbcidentify/boardtype"
-	"github.com/rinzlerlabs/viam-raspi-sensors/powermanager/jetson"
-	"github.com/rinzlerlabs/viam-raspi-sensors/powermanager/raspberrypi"
+	"github.com/rinzlerlabs/viam-sbc-hwmonitor/powermanager/jetson"
+	"github.com/rinzlerlabs/viam-sbc-hwmonitor/powermanager/raspberrypi"
 )
 
 type ComponentConfig struct {

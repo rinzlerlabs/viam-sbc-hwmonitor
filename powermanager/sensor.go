@@ -4,8 +4,8 @@ import (
 	"context"
 	"sync"
 
-	"github.com/rinzlerlabs/viam-raspi-sensors/powermanager/cpufrequtils"
-	"github.com/rinzlerlabs/viam-raspi-sensors/utils"
+	"github.com/rinzlerlabs/viam-sbc-hwmonitor/powermanager/cpufrequtils"
+	"github.com/rinzlerlabs/viam-sbc-hwmonitor/utils"
 	"go.viam.com/rdk/components/sensor"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"

@@ -1,4 +1,4 @@
-module github.com/rinzlerlabs/viam-raspi-sensors
+module github.com/rinzlerlabs/viam-sbc-hwmonitor
 
 go 1.23.2
 

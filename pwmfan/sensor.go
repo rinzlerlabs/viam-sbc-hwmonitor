@@ -12,7 +12,7 @@ import (
 	"go.viam.com/rdk/resource"
 	viam_utils "go.viam.com/utils"
 
-	"github.com/rinzlerlabs/viam-raspi-sensors/utils"
+	"github.com/rinzlerlabs/viam-sbc-hwmonitor/utils"
 )
 
 var (

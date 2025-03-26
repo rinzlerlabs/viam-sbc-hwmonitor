@@ -9,8 +9,9 @@ import (
 	"fmt"
 
 	"github.com/NVIDIA/go-nvml/pkg/nvml"
-	"github.com/rinzlerlabs/viam-sbc-hwmonitor/utils"
 	"go.viam.com/rdk/logging"
+
+	"github.com/rinzlerlabs/viam-sbc-hwmonitor/utils"
 )
 
 var (
@@ -26,6 +27,12 @@ var (
 	nvidiaPowerSensors      = []string{"power", "power_limit", "default_limit"}        // Sensors that report power values
 	nvidiaPowerStateSensors = []string{"power_state"}                                  // Sensors that report power state values
 	nvidiaMemorySensors     = []string{"mem"}                                          // Sensors that report memory values
+	nvidia_smi_command      = []string{
+		"vidia-smi",
+		"--query-gpu",
+		"name,count,uuid,gpu_serial,pci.bus,pci.device,pcie.link.gen.gpucurrent,pcie.link.gen.max,pcie.link.gen.gpumax,pcie.link.gen.hostmax,pcie.link.width.current,pcie.link.width.max,display_mode,display_active,vbios_version,reset_status.reset_required,reset_status.drain_and_reset_recommended,gpu_operation_mode.current,gpu_operation_mode.pending,fan.speed,pstate,clocks_event_reasons.hw_slowdown,clocks_event_reasons.sw_power_cap,clocks_event_reasons.hw_thermal_slowdown,clocks_event_reasons.active,clocks_event_reasons.gpu_idle,clocks_event_reasons.applications_clocks_setting,clocks_event_reasons.hw_power_brake_slowdown,clocks_event_reasons.sw_thermal_slowdown,clocks_event_reasons.sync_boost,memory.total,memory.reserved,memory.used,memory.free,compute_mode,compute_cap,utilization.gpu,utilization.memory,utilization.encoder,utilization.decoder,utilization.jpeg,utilization.ofa,encoder.stats.sessionCount,encoder.stats.averageFps,encoder.stats.averageLatency,temperature.gpu,temperature.gpu.tlimit,temperature.memory,power.management,power.draw,power.draw.average,power.draw.instant,power.limit,enforced.power.limit,power.default_limit,power.min_limit,power.max_limit,clocks.current.graphics,clocks.current.sm,clocks.current.memory,clocks.current.video,clocks.max.graphics,clocks.max.sm,clocks.max.memory",
+		"--format=csv,noheader",
+	}
 )
 
 func hasNVIDIAGPU() bool {

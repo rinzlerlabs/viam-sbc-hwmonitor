@@ -13,6 +13,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/rinzlerlabs/viam-sbc-hwmonitor/utils"
 )
 
 var (
@@ -306,12 +308,13 @@ func newProcessWithName(pid int, name string) (*process, error) {
 	return proc, nil
 }
 
-func getProcessByExe(exe string) (*process, error) {
+func getProcessesByExe(exe string) (utils.OrderedMap[int, *process], error) {
 	matches, err := filepath.Glob("/proc/[0-9]*/exe")
 	if err != nil {
 		return nil, err
 	}
 
+	procs := utils.NewOrderedMap[int, *process]()
 	for _, exePath := range matches {
 		target, err := os.Readlink(exePath)
 		if err != nil {
@@ -323,19 +326,28 @@ func getProcessByExe(exe string) (*process, error) {
 			if err != nil {
 				return nil, err
 			}
-			return newProcessWithExe(int(pid), exe)
+			proc, err := newProcessWithExe(int(pid), exe)
+			if err != nil {
+				// TODO: Log the error...
+				continue
+			}
+			procs.Set(int(pid), proc)
 		}
 	}
 
-	return nil, ErrProcessNotFound
+	if procs.Len() == 0 {
+		return nil, ErrProcessNotFound
+	}
+	return procs, nil
 }
 
-func getProcessByName(name string) (*process, error) {
+func getProcessesByName(name string) (utils.OrderedMap[int, *process], error) {
 	matches, err := filepath.Glob("/proc/[0-9]*/cmdline")
 	if err != nil {
 		return nil, err
 	}
 
+	procs := utils.NewOrderedMap[int, *process]()
 	for _, match := range matches {
 		data, err := os.ReadFile(match)
 		if err != nil {
@@ -350,11 +362,19 @@ func getProcessByName(name string) (*process, error) {
 			if err != nil {
 				return nil, err
 			}
-			return newProcessWithName(int(pid), name)
+			proc, err := newProcessWithName(int(pid), name)
+			if err != nil {
+				// TODO: Log the error...
+				continue
+			}
+			procs.Set(int(pid), proc)
 		}
 	}
 
-	return nil, ErrProcessNotFound
+	if procs.Len() == 0 {
+		return nil, ErrProcessNotFound
+	}
+	return procs, nil
 }
 
 func (p *process) parseStatFile() (*processStat, error) {

@@ -1,18 +1,23 @@
-//go:build full_nvidia_support
-// +build full_nvidia_support
-
 package gpumonitor
 
 import (
 	"context"
 	"testing"
 
-	"github.com/rinzlerlabs/viam-sbc-hwmonitor/utils"
 	"github.com/stretchr/testify/require"
 	"go.viam.com/rdk/logging"
+
+	"github.com/rinzlerlabs/viam-sbc-hwmonitor/utils"
 )
 
+func skipIfNoNvidiaDriver(t *testing.T) {
+	if hasNvidiaSmiCommand() == false {
+		t.Skipf("This test requires an NVIDIA gpu and the nvidia-smi command to be present")
+	}
+}
+
 func TestNvidiaGPU(t *testing.T) {
+	skipIfNoNvidiaDriver(t)
 	ctx := context.Background()
 	logger := logging.NewTestLogger(t)
 	monitor, err := newNVIDIAGpuMonitor(logger)
@@ -25,6 +30,7 @@ func TestNvidiaGPU(t *testing.T) {
 }
 
 func TestNvidiaGpu_Readings(t *testing.T) {
+	skipIfNoNvidiaDriver(t)
 	ctx := context.Background()
 	logger := logging.NewTestLogger(t)
 	jetson, err := newNVIDIAGpuMonitor(logger)

@@ -15,16 +15,12 @@ var (
 )
 
 type gpuReadingType string
-type gpuSensorType string
 
 const (
-	// GPU sensor types
-	GPUSensorTypePower      gpuSensorType = "power"
-	GPUSensorTypePowerState gpuSensorType = "power_state"
-	GPUSensorTypeFrequency  gpuSensorType = "frequency"
-	GPUSensorTypeLoad       gpuSensorType = "load"
-	GPUSensorTypeMemory     gpuSensorType = "memory"
-
+	GPUReadingTypeOther                            gpuReadingType = "other"
+	GPUReadingTypeName                             gpuReadingType = "name"
+	GPUReadingTypeUUID                             gpuReadingType = "uuid"
+	GPUReadingTypePCIeAddress                      gpuReadingType = "pciAddress"
 	GPUReadingTypeMemoryFree                       gpuReadingType = "memoryFree"
 	GPUReadingTypeMemoryUsed                       gpuReadingType = "memoryUsed"
 	GPUReadingTypeMemoryTotal                      gpuReadingType = "memoryTotal"
@@ -48,6 +44,9 @@ const (
 	GPUReadingTypeClocksMemory                     gpuReadingType = "clocksMemory"
 	GPUReadingTypeCLocksMemoryMax                  gpuReadingType = "clocksMemoryMax"
 	GPUReadingTypeClocksVideo                      gpuReadingType = "clocksVideo"
+	GPUReadingTypeClocksVideoImageCompositor       gpuReadingType = "clocksVideoImageCompositor"
+	GPUReadingTypeClocksJPEG                       gpuReadingType = "clocksJPEG"
+	GPUReadingTypeClocksOFA                        gpuReadingType = "clocksOFA"
 	GPUReadingTypeThrottleGPUIdle                  gpuReadingType = "throttleGPUIdle"
 	GPUReadingTypeThrottleConfigSetting            gpuReadingType = "throttleConfigSetting"
 	GPUReadingTypeThrottleConfigPowerLimit         gpuReadingType = "throttleConfigPowerLimit"
@@ -66,29 +65,31 @@ const (
 	GPUReadingTypeGPUModePending                   gpuReadingType = "gpuModePending"
 )
 
-type gpuSensor interface {
-	GetSensorReading(context.Context) (*gpuSensorReading, error)
-	Name() string
-}
-
 type gpuMonitor interface {
+	// Close closes the GPU monitor.
 	Close() error
-	GetGPUStats(context.Context) ([][]gpuSensorReading, error)
+	// GetGPUStats returns a map of GPU sensor readings.
+	// The key is the identifier for the GPU in the system.
+	// The value is a slice of gpuSensorReading.
+	// The slice contains the readings for each sensor on the GPU.
+	// The readings are in the order they were found.
+	// The readings are not guaranteed to be in any particular order.
+	// The readings are guaranteed to be unique.
+	GetGPUStats(context.Context) (map[string][]gpuSensorReading, error)
 }
 
 type gpuSensorReading struct {
-	Name  string
 	Type  gpuReadingType
-	Value int64
+	Value any
 }
 
 func (g gpuSensorReading) String(f fmt.State) string {
 	if f.Flag('#') {
-		return fmt.Sprintf("{ Name: %s, Type: %s, Current: %d }",
-			g.Name, g.Type, g.Value)
+		return fmt.Sprintf("{ Type: %s, Current: %d }",
+			g.Type, g.Value)
 	} else {
-		return fmt.Sprintf("{ %s %s %d }",
-			g.Name, g.Type, g.Value)
+		return fmt.Sprintf("{ %s %d }",
+			g.Type, g.Value)
 	}
 }
 
@@ -99,8 +100,7 @@ func (g gpuSensorReading) Format(f fmt.State, c rune) {
 func newGpuMonitor(logger logging.Logger) (gpuMonitor, error) {
 	if sbcidentify.IsBoardType(boardtype.NVIDIA) {
 		return newJetsonGpuMonitor(logger)
-	}
-	if hasNvidiaSmiCommand() {
+	} else if hasNvidiaSmiCommand(logger) {
 		return newNVIDIAGpuMonitor(logger)
 	}
 	return nil, ErrUnsupportedBoard

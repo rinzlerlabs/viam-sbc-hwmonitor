@@ -9,8 +9,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.viam.com/rdk/logging"
-
-	"github.com/rinzlerlabs/viam-sbc-hwmonitor/utils"
 )
 
 func TestJetsonGpuGetsFrequencies(t *testing.T) {
@@ -26,7 +24,7 @@ func TestJetsonGpuGetsFrequencies(t *testing.T) {
 	for _, gpuStat := range gpuStats {
 		for _, stat := range gpuStat {
 			logger.Infof("GPU: %#v", stat)
-			assert.NotEmpty(t, stat.Name)
+			assert.NotEmpty(t, stat.Type)
 		}
 	}
 }
@@ -41,11 +39,12 @@ func TestJetsonGpu_Readings(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, stats)
 	require.Len(t, stats, 7)
+	mon, err := newGpuMonitor(logger)
+	require.NoError(t, err)
 	sensor := &Config{
-		logger: logger,
-		stats:  utils.NewCappedCollection[sample](10),
+		logger:     logger,
+		gpuMonitor: mon,
 	}
-	sensor.stats.Push(sample{DeviceStats: stats})
 	res, err := sensor.Readings(ctx, nil)
 	require.NoError(t, err)
 	require.NotNil(t, res)

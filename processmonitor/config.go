@@ -14,9 +14,9 @@ type ComponentConfig struct {
 	IncludeCwd           bool   `json:"include_cwd"`
 	IncludeOpenFileCount bool   `json:"include_open_file_count"`
 	IncludeMemInfo       bool   `json:"include_mem_info"`
-	// IncludeOpenFiles     bool   `json:"include_open_files"`
-	// IncludeUlimits bool `json:"include_ulimits"`
-	// IncludeNetStats      bool   `json:"include_net_stats"`
+	IncludeOpenFiles     bool   `json:"include_open_files"`
+	IncludeUlimits       bool   `json:"include_ulimits"`
+	IncludeNetStats      bool   `json:"include_net_stats"`
 }
 
 func (conf *ComponentConfig) Validate(path string) ([]string, error) {

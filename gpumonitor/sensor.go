@@ -2,10 +2,7 @@ package gpumonitor
 
 import (
 	"context"
-	"fmt"
-	"sort"
 	"sync"
-	"time"
 
 	"go.viam.com/rdk/components/sensor"
 	"go.viam.com/rdk/logging"
@@ -24,14 +21,11 @@ var (
 
 type Config struct {
 	resource.Named
-	wg         sync.WaitGroup
 	mu         sync.RWMutex
 	logger     logging.Logger
 	cancelCtx  context.Context
 	cancelFunc func()
-	task       func()
-	stats      utils.CappedCollection[sample]
-	sleepTime  time.Duration
+	gpuMonitor gpuMonitor
 }
 
 func init() {
@@ -68,115 +62,44 @@ func (c *Config) Reconfigure(ctx context.Context, _ resource.Dependencies, conf 
 	if c.cancelFunc != nil {
 		c.cancelFunc()
 	}
-	c.logger.Infof("Waiting for background task to stop")
-	c.wg.Wait()
 
 	c.cancelCtx, c.cancelFunc = context.WithCancel(context.Background())
 
-	newConf, err := resource.NativeConfig[*ComponentConfig](conf)
+	_, err := resource.NativeConfig[*ComponentConfig](conf)
 	if err != nil {
 		return err
 	}
 
 	// In case the module has changed name
 	c.Named = conf.ResourceName().AsNamed()
-	c.sleepTime = 1 * time.Second
-	if newConf.SleepTimeMs > 0 {
-		c.sleepTime = time.Duration(newConf.SleepTimeMs) * time.Millisecond
+	c.gpuMonitor, err = newGpuMonitor(c.logger)
+	if err != nil {
+		return err
 	}
-	collectionSize := calculateCollectionSize(c.sleepTime)
-	c.logger.Infof("Sleep time: %v, Collection size: %v", c.sleepTime, collectionSize)
-	c.stats = utils.NewCappedCollection[sample](collectionSize)
-	c.task = c.captureGPUStats
-	go c.task()
 	c.logger.Debugf("reconfigure complete %s", PrettyName)
 	return nil
-}
-
-func calculateCollectionSize(sleepTime time.Duration) int {
-	collectionSize := int(1 / sleepTime.Seconds())
-	if collectionSize < 1 {
-		collectionSize = 1
-	}
-	return collectionSize
 }
 
 func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	m := make(map[string][]gpuSensorReading)
-	for _, sample := range c.stats.Items() {
-		for _, stats := range sample.DeviceStats {
-			m[stats.Name] = append(m[stats.Name], stats)
-		}
+	m := make(map[string]interface{})
+	sample, err := c.gpuMonitor.GetGPUStats(ctx)
+	if err != nil {
+		return nil, err
 	}
-
-	tmp := make(map[string]float64)
-	for name, stats := range m {
-		statCount := map[gpuSensorType]int{}
-		for _, stat := range stats {
-			switch stat.Type {
-			case GPUSensorTypeFrequency:
-				if stat.HasCurrentValue {
-					tmp[fmt.Sprintf("%s-current_frequency", name)] += float64(stat.CurrentValue)
-				}
-				if stat.HasMaxValue {
-					tmp[fmt.Sprintf("%s-max_frequency", name)] += float64(stat.MaxValue)
-				}
-				if stat.HasMinValue {
-					tmp[fmt.Sprintf("%s-min_frequency", name)] += float64(stat.MinValue)
-				}
-				statCount[GPUSensorTypeFrequency]++
-			case GPUSensorTypeLoad:
-				tmp[fmt.Sprintf("%s-load", name)] += float64(stat.CurrentValue)
-				statCount[GPUSensorTypeLoad]++
-			case GPUSensorTypePower:
-				tmp[fmt.Sprintf("%s-mW", name)] += float64(stat.CurrentValue)
-				statCount[GPUSensorTypePower]++
-			case GPUSensorTypePowerState:
-				tmp[name] += float64(stat.CurrentValue)
-				statCount[GPUSensorTypePowerState]++
-			case GPUSensorTypeMemory:
-				tmp[fmt.Sprintf("%s-memory_used", name)] += float64(stat.CurrentValue)
-				statCount[GPUSensorTypeMemory]++
+	for key, typedStats := range sample {
+		stats := make(map[string]interface{}, len(typedStats))
+		for _, stat := range typedStats {
+			if stat.Type == "" {
+				continue
 			}
+			stats[string(stat.Type)] = stat.Value
 		}
-		// Average the values
-		for t, count := range statCount {
-			switch t {
-			case GPUSensorTypeMemory:
-				tmp[fmt.Sprintf("%s-memory_used", name)] /= float64(count)
-			case GPUSensorTypeFrequency:
-				if _, ok := tmp[fmt.Sprintf("%s-current_frequency", name)]; ok {
-					tmp[fmt.Sprintf("%s-current_frequency", name)] /= float64(count)
-				}
-				if _, ok := tmp[fmt.Sprintf("%s-max_frequency", name)]; ok {
-					tmp[fmt.Sprintf("%s-max_frequency", name)] /= float64(count)
-				}
-				if _, ok := tmp[fmt.Sprintf("%s-min_frequency", name)]; ok {
-					tmp[fmt.Sprintf("%s-min_frequency", name)] /= float64(count)
-				}
-			case GPUSensorTypeLoad:
-				tmp[fmt.Sprintf("%s-load", name)] /= float64(len(stats))
-			case GPUSensorTypePower:
-				tmp[fmt.Sprintf("%s-mW", name)] /= float64(len(stats))
-			case GPUSensorTypePowerState:
-				tmp[name] /= float64(len(stats))
-			}
-		}
+		m[key] = stats
 	}
 
-	ret := make(map[string]interface{})
-	keys := make([]string, 0, len(tmp))
-	for k := range tmp {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	for _, k := range keys {
-		ret[k] = tmp[k]
-	}
-
-	return ret, nil
+	return m, nil
 }
 
 func (c *Config) Close(ctx context.Context) error {
@@ -184,40 +107,10 @@ func (c *Config) Close(ctx context.Context) error {
 	defer c.mu.Unlock()
 	c.logger.Info("shutting down")
 	c.cancelFunc()
-	c.wg.Wait()
 	c.logger.Info("shutdown complete")
 	return nil
 }
 
 func (c *Config) Ready(ctx context.Context, extra map[string]interface{}) (bool, error) {
 	return false, nil
-}
-
-func (c *Config) captureGPUStats() {
-	c.wg.Add(1)
-	defer c.wg.Done()
-	gpuMonitor, err := newGpuMonitor(c.logger)
-	if err != nil {
-		c.logger.Warnf("Failed to initialize GPU monitor: %v", err)
-		return
-	}
-	c.logger.Debug("starting GPU stats main loop")
-	for {
-		select {
-		case <-c.cancelCtx.Done():
-			return
-		case <-time.After(c.sleepTime):
-			currStats, err := gpuMonitor.GetGPUStats(c.cancelCtx)
-			if err != nil {
-				c.logger.Warnf("Failed to read GPU stats, skipping iteration: %v", err)
-				continue
-			}
-			sample := sample{DeviceStats: currStats}
-			c.stats.Push(sample)
-		}
-	}
-}
-
-type sample struct {
-	DeviceStats []gpuSensorReading
 }

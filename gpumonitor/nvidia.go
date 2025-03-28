@@ -14,79 +14,17 @@ import (
 	"github.com/rinzlerlabs/viam-sbc-hwmonitor/utils"
 )
 
-var (
-	errUnsupportedSensorType   = errors.New("unsupported sensor type")
-	nvidia_smi                 = "nvidia-smi"
-	nvidia_smi_default_columns = []string{
-		"name",
-		"count",
-		"uuid",
-		"gpu_serial",
-		"pci.bus_id",
-		"pcie.link.gen.gpucurrent",
-		"pcie.link.gen.max",
-		"pcie.link.gen.gpumax",
-		"pcie.link.gen.hostmax",
-		"pcie.link.width.current",
-		"pcie.link.width.max",
-		"display_mode",
-		"display_active",
-		"vbios_version",
-		"gpu_operation_mode.current",
-		"gpu_operation_mode.pending",
-		"fan.speed",
-		"pstate",
-		"clocks_event_reasons.hw_slowdown",
-		"clocks_event_reasons.sw_power_cap",
-		"clocks_event_reasons.hw_thermal_slowdown",
-		"clocks_event_reasons.active",
-		"clocks_event_reasons.gpu_idle",
-		"clocks_event_reasons.applications_clocks_setting",
-		"clocks_event_reasons.hw_power_brake_slowdown",
-		"clocks_event_reasons.sw_thermal_slowdown",
-		"clocks_event_reasons.sync_boost",
-		"memory.total",
-		"memory.reserved",
-		"memory.used",
-		"memory.free",
-		"compute_mode",
-		"compute_cap",
-		"utilization.gpu",
-		"utilization.memory",
-		"utilization.encoder",
-		"utilization.decoder",
-		"utilization.jpeg",
-		"utilization.ofa",
-		"encoder.stats.sessionCount",
-		"encoder.stats.averageFps",
-		"encoder.stats.averageLatency",
-		"temperature.gpu",
-		"temperature.gpu.tlimit",
-		"temperature.memory",
-		"power.management",
-		"power.draw",
-		"power.draw.average",
-		"power.draw.instant",
-		"power.limit",
-		"enforced.power.limit",
-		"power.default_limit",
-		"power.min_limit",
-		"power.max_limit",
-		"clocks.current.graphics",
-		"clocks.current.sm",
-		"clocks.current.memory",
-		"clocks.current.video",
-		"clocks.max.graphics",
-		"clocks.max.sm",
-		"clocks.max.memory",
-	}
-	nvidia_smi_parameters = []string{
-		"--query-gpu",
-		strings.Join(utils.Values(nvidiaColumnsByGPUReadingTypes), ","),
-		"--format=csv",
-	}
+const (
+	nvidiaSmi = "nvidia-smi"
+)
 
-	nvidiaColumnsByGPUReadingTypes = map[gpuReadingType]string{
+var (
+	nvidiaSmiDefaultSensors        = utils.Values(nvidiaSensorsByGPUReadingTypes)
+	nvidiaGPUReadingTypesBySensor  = utils.Invert(nvidiaSensorsByGPUReadingTypes)
+	nvidiaSensorsByGPUReadingTypes = map[gpuReadingType]string{
+		GPUReadingTypeName:                             "name",
+		GPUReadingTypeUUID:                             "uuid",
+		GPUReadingTypePCIeAddress:                      "gpu_bus_id",
 		GPUReadingTypeMemoryFree:                       "memory.free",
 		GPUReadingTypeMemoryUsed:                       "memory.used",
 		GPUReadingTypeMemoryTotal:                      "memory.total",
@@ -98,7 +36,7 @@ var (
 		GPUReadingTypeUtilizationJPEG:                  "utilization.jpeg",
 		GPUReadingTypeUtilizationOFA:                   "utilization.ofa",
 		GPUReadingTypeTemperatureGPU:                   "temperature.gpu",
-		GPUReadingTypeTemperatureGPULimit:              "temperature.gpi.tlimit",
+		GPUReadingTypeTemperatureGPULimit:              "temperature.gpu.tlimit",
 		GPUReadingTypeTemperatureMemory:                "temperature.memory",
 		GPUReadingTypePowerDraw:                        "power.draw",
 		GPUReadingTypePowerLimit:                       "power.limit",
@@ -124,43 +62,60 @@ var (
 		GPUReadingTypePCIeLinkGenMax:                   "pcie.link.gen.max",
 		GPUReadingTypePCIeWidthCurrent:                 "pcie.link.width.current",
 		GPUReadingTypePCIeWidthMax:                     "pcie.link.width.max",
-		GPUReadingTypeGPUModeCurrent:                   "gpu_operation_mode.current",
-		GPUReadingTypeGPUModePending:                   "gpu_operation_mode.pending",
+		GPUReadingTypeGPUModeCurrent:                   "gom.current",
+		GPUReadingTypeGPUModePending:                   "gom.pending",
 	}
-
-	nvidiaGPUReadingTypesByColumns = utils.Invert(nvidiaColumnsByGPUReadingTypes)
 )
 
-func hasNvidiaSmiCommand() bool {
+func hasNvidiaSmiCommand(logger logging.Logger) bool {
 	cmd := exec.Command("which", "nvidia-smi")
-	err := cmd.Run()
-	return err == nil
+	stdOut, stdErr := cmd.CombinedOutput()
+	logger.Debugf("which nvidia-smi command output: %s", stdOut)
+	if stdErr != nil {
+		logger.Debugf("nvidia-smi command not found: %v", stdErr)
+		return false
+	}
+	return true
 }
 
-func newNVIDIAGpuMonitor(logger logging.Logger) (gpuMonitor, error) {
+func newNVIDIAGpuMonitor(logger logging.Logger, extraSensors ...string) (gpuMonitor, error) {
+	sensorsToQuery := make(map[string]bool)
+	for _, sensor := range nvidiaSmiDefaultSensors {
+		sensorsToQuery[sensor] = true
+	}
+	for _, sensor := range extraSensors {
+		sensorsToQuery[sensor] = true
+	}
+
 	monitor := &nvidiaGpuMonitor{
-		logger: logger,
+		logger:         logger,
+		sensorsToQuery: utils.Keys(sensorsToQuery),
 	}
 
 	return monitor, nil
 }
 
 type nvidiaGpuMonitor struct {
-	logger logging.Logger
+	logger         logging.Logger
+	sensorsToQuery []string
 }
 
 func (n *nvidiaGpuMonitor) Close() error {
 	return nil
 }
 
-func (n *nvidiaGpuMonitor) GetGPUStats(ctx context.Context) ([]gpuSensorReading, error) {
-	stats := make([]gpuSensorReading, 0)
+func (n *nvidiaGpuMonitor) GetGPUStats(ctx context.Context) (map[string][]gpuSensorReading, error) {
 
-	cmd := exec.Command(nvidia_smi, nvidia_smi_parameters...)
-	output, err := cmd.CombinedOutput()
+	output, err := getNvidiaSmiOutput()
 	if err != nil {
 		return nil, errors.Join(errors.New("error detecting gpus with nvidia-smi"), err)
 	}
+	n.logger.Debugf("nvidia-smi output: %s", output)
+	return n.parseNvidiaSmiOutput(output)
+}
+
+func (n *nvidiaGpuMonitor) parseNvidiaSmiOutput(output []byte) (map[string][]gpuSensorReading, error) {
+	stats := make(map[string][]gpuSensorReading, 0)
 	reader := csv.NewReader(bytes.NewReader(output))
 	reader.TrimLeadingSpace = true
 
@@ -175,26 +130,76 @@ func (n *nvidiaGpuMonitor) GetGPUStats(ctx context.Context) ([]gpuSensorReading,
 	}
 
 	for _, row := range rows {
+		var gpuID string
+		readings := make([]gpuSensorReading, 0)
 		if len(row) != len(headers) {
 			return nil, errors.New("mismatched header and row lengths")
 		}
 		for i, header := range headers {
+			normalizedHeader := getNormalizedHeader(header)
 			row[i] = strings.TrimSpace(row[i])
-			val, err := strconv.Atoi(row[i])
-			if err != nil {
-				n.logger.Infof("error converting value to int: %s", row[i])
+			if nvidiaGPUReadingTypesBySensor[normalizedHeader] == GPUReadingTypeUUID {
+				gpuID = row[i]
 				continue
 			}
-			stats = append(stats, gpuSensorReading{
-				Name:  header,
-				Type:  nvidiaGPUReadingTypesByColumns[header],
-				Value: int64(val),
+			var val any
+			switch row[i] {
+			case "[N/A]":
+				fallthrough
+			case "N/A":
+				val = row[i]
+			case "Active":
+				val = true
+			case "Not Active":
+				val = false
+			default:
+				if strings.Contains(row[i], "-") || strings.Contains(row[i], ":") || strings.HasPrefix(row[i], "P") {
+					val = row[i]
+					continue
+				}
+				val, err = strconv.ParseInt(row[i], 10, 64)
+				if err == nil {
+					break
+				}
+				val, err = strconv.ParseFloat(row[i], 64)
+				if err == nil {
+					break
+				}
+				if normalizedHeader == string(GPUReadingTypeName) {
+					val = row[i]
+					break
+				}
+				n.logger.Debugf("error parsing value %s for sensor %s, treating as a string: %v", row[i], normalizedHeader, err)
+				val = row[i]
+			}
+			if _, ok := nvidiaGPUReadingTypesBySensor[normalizedHeader]; !ok {
+				n.logger.Debugf("skipping sensor %s, it is not in the list", normalizedHeader)
+				continue
+			}
+			readings = append(readings, gpuSensorReading{
+				Type:  nvidiaGPUReadingTypesBySensor[normalizedHeader],
+				Value: val,
 			})
 		}
+		stats[gpuID] = readings
 	}
-
 	return stats, nil
 }
 
-type nvidiaSmiSample struct {
+func getNvidiaSmiOutput() ([]byte, error) {
+	cmd := exec.Command(nvidiaSmi, "--query-gpu", strings.Join(nvidiaSmiDefaultSensors, ","), "--format=csv,nounits")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, errors.Join(errors.New("error detecting gpus with nvidia-smi"), err)
+	}
+	return output, nil
+}
+
+func getNormalizedHeader(header string) string {
+	for _, sensor := range nvidiaSmiDefaultSensors {
+		if strings.Contains(header, sensor) {
+			return sensor
+		}
+	}
+	return header
 }

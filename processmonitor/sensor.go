@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"sync"
-	"time"
 
 	"go.viam.com/rdk/components/sensor"
 	"go.viam.com/rdk/logging"
@@ -33,7 +32,6 @@ type Config struct {
 	info       *procInfo
 	processes  utils.OrderedMap[int, *process]
 	workers    *goutils.StoppableWorkers
-	readings   map[string]interface{}
 }
 
 type procInfo struct {
@@ -96,15 +94,13 @@ func (c *Config) Reconfigure(ctx context.Context, _ resource.Dependencies, conf 
 		IncludeCwd:           newConf.IncludeCwd,
 		IncludeOpenFileCount: newConf.IncludeOpenFileCount,
 		IncludeMemInfo:       newConf.IncludeMemInfo,
-		// IncludeUlimits:       newConf.IncludeUlimits,
-		// IncludeOpenFiles:     newConf.IncludeOpenFiles,
-		// IncludeNetStats:      newConf.IncludeNetStats,
+		IncludeUlimits:       newConf.IncludeUlimits,
+		IncludeOpenFiles:     newConf.IncludeOpenFiles,
+		IncludeNetStats:      newConf.IncludeNetStats,
 	}
 
 	// In case the module has changed name
 	c.Named = conf.ResourceName().AsNamed()
-
-	c.workers = goutils.NewBackgroundStoppableWorkers(c.Update)
 
 	return nil
 }
@@ -118,11 +114,13 @@ func procExists(proc *process) bool {
 }
 
 // Get the process to monitor, if it hasn't already been found, or is no longer running, try to find it (again)
-func (c *Config) getProcesses() (utils.OrderedMap[int, *process], error) {
+func (c *Config) updateProcessList() error {
 	procs := utils.NewOrderedMap[int, *process]()
-	for pid, proc := range c.processes.AllFromFront() {
-		if procExists(proc) {
-			procs.Set(pid, proc)
+	if c.processes != nil {
+		for pid, proc := range c.processes.AllFromFront() {
+			if procExists(proc) {
+				procs.Set(pid, proc)
+			}
 		}
 	}
 
@@ -133,10 +131,10 @@ func (c *Config) getProcesses() (utils.OrderedMap[int, *process], error) {
 	} else if c.info.Name != "" {
 		newProcs, err = getProcessesByName(c.info.Name)
 	} else {
-		return nil, errors.New("no process specified")
+		return errors.New("no process specified")
 	}
 	if err != nil {
-		return nil, err
+		return err
 	}
 	for newProcPid, newProc := range newProcs.AllFromFront() {
 		if procs.Has(newProcPid) {
@@ -145,88 +143,79 @@ func (c *Config) getProcesses() (utils.OrderedMap[int, *process], error) {
 		procs.Set(newProcPid, newProc)
 	}
 	c.processes = procs
-	return c.processes, nil
+	return nil
 }
 
 func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return c.readings, nil
+	return c.getReadings(ctx)
 }
 
-func (c *Config) Update(ctx context.Context) {
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-time.After(1 * time.Second):
-			resp := make(map[string]interface{})
+func (c *Config) getReadings(ctx context.Context) (map[string]interface{}, error) {
+	resp := make(map[string]interface{})
+	err := c.updateProcessList()
+	if err != nil {
+		c.logger.Warnf("Error getting process: %v", err)
+		return nil, err
+	}
 
-			procs, err := c.getProcesses()
-			if err != nil {
-				c.logger.Warnf("Error getting process: %v", err)
-				continue
+	for _, proc := range c.processes.AllFromFront() {
+		if err := proc.UpdateStats(ctx); err != nil {
+			c.logger.Warnf("Error updating process stats: %v", err)
+		} else {
+			ret := make(map[string]interface{})
+			if c.info.Name != "" {
+				ret["name"] = proc.Name
+			}
+			if c.info.ExecutablePath != "" {
+				ret["exe"] = proc.Exe
 			}
 
-			for _, proc := range procs.AllFromFront() {
-				if err := proc.UpdateStats(ctx); err != nil {
-					c.logger.Warnf("Error updating process stats: %v", err)
+			ret["pid"] = proc.Pid
+			ret["cpu"] = proc.CPUPercent()
+			ret["cpu_since_boot"] = proc.CPUPercentSinceBoot()
+			ret["threads"] = proc.NumThreads()
+
+			if c.info.IncludeCwd {
+				ret["cwd"] = proc.Cwd
+			}
+			if c.info.IncludeCmdline {
+				ret["cmdline"] = proc.CmdLine
+			}
+			if c.info.IncludeOpenFileCount {
+				fc, err := proc.GetOpenFileCount()
+				if err != nil {
+					c.logger.Warnf("Error getting process open file count: %v", err)
 				} else {
-					ret := make(map[string]interface{})
-					if c.info.Name != "" {
-						ret["name"] = proc.Name
-					}
-					if c.info.ExecutablePath != "" {
-						ret["exe"] = proc.Exe
-					}
-
-					ret["pid"] = proc.Pid
-					ret["cpu"] = proc.CPUPercent()
-					ret["cpu_since_boot"] = proc.CPUPercentSinceBoot()
-					ret["threads"] = proc.NumThreads()
-
-					if c.info.IncludeCwd {
-						ret["cwd"] = proc.Cwd
-					}
-					if c.info.IncludeCmdline {
-						ret["cmdline"] = proc.CmdLine
-					}
-					if c.info.IncludeOpenFileCount {
-						fc, err := proc.GetOpenFileCount()
-						if err != nil {
-							c.logger.Warnf("Error getting process open file count: %v", err)
-						} else {
-							ret["open_files"] = fc
-						}
-					}
-					if c.info.IncludeEnv {
-						env, err := proc.GetEnv()
-						if err != nil {
-							c.logger.Warnf("Error getting process environment: %v", err)
-						} else {
-							ret["env"] = env
-						}
-					}
-					if c.info.IncludeMemInfo {
-						mem, err := proc.GetMemoryInfo()
-						if err != nil {
-							c.logger.Warnf("Error getting process memory: %v", err)
-						} else {
-							ret["mem_rss"] = mem.VmRSS
-							ret["mem_hwm"] = mem.VmHWM
-							ret["mem_data"] = mem.VmData
-							ret["mem_stack"] = mem.VmStack
-							ret["mem_swap"] = mem.VmSwap
-							ret["mem_size"] = mem.VmSize
-						}
-					}
-					resp[fmt.Sprintf("%d", proc.Pid)] = ret
+					ret["open_files"] = fc
 				}
 			}
-
-			c.readings = resp
+			if c.info.IncludeEnv {
+				env, err := proc.GetEnv()
+				if err != nil {
+					c.logger.Warnf("Error getting process environment: %v", err)
+				} else {
+					ret["env"] = env
+				}
+			}
+			if c.info.IncludeMemInfo {
+				mem, err := proc.GetMemoryInfo()
+				if err != nil {
+					c.logger.Warnf("Error getting process memory: %v", err)
+				} else {
+					ret["mem_rss"] = mem.VmRSS
+					ret["mem_hwm"] = mem.VmHWM
+					ret["mem_data"] = mem.VmData
+					ret["mem_stack"] = mem.VmStack
+					ret["mem_swap"] = mem.VmSwap
+					ret["mem_size"] = mem.VmSize
+				}
+			}
+			resp[fmt.Sprintf("%d", proc.Pid)] = ret
 		}
 	}
+	return resp, nil
 }
 
 // func resourceToString(r int32) string {

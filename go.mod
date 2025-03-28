@@ -3,7 +3,6 @@ module github.com/rinzlerlabs/viam-sbc-hwmonitor
 go 1.23.2
 
 require (
-	github.com/NVIDIA/go-nvml v0.12.4-1
 	github.com/elliotchance/orderedmap/v3 v3.1.0
 	github.com/rinzlerlabs/sbcidentify v0.1.2
 	github.com/shirou/gopsutil/v4 v4.24.11

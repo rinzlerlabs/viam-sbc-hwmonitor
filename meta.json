@@ -54,9 +54,9 @@
     }
   ],
   "build": {
-    "build": "make package PLATFORM=linux/amd64 BUILD_TAGS=full_nvidia_support",
-    "path": "package/rinzlerlabs-sbc-hwmonitor_linux_amd64.tar.gz",
-    "arch": ["linux/amd64"]
+    "build": "make package",
+    "path": "package/rinzlerlabs-sbc-hwmonitor_linux_arm64.tar.gz",
+    "arch": ["linux/arm64"]
   },
   "entrypoint": "bin/rinzlerlabs-sbc-hwmonitor",
   "first_run": ""

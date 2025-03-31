@@ -24,6 +24,7 @@ jobs:
       run: make test
   publish:
     runs-on: ubuntu-latest
+    needs: test
     steps:
     - uses: actions/checkout@v3
     - uses: viamrobotics/build-action@v1

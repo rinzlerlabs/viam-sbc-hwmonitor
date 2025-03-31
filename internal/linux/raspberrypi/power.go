@@ -1,4 +1,4 @@
-package voltages
+package raspberrypi
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/rinzlerlabs/viam-sbc-hwmonitor/internal/sensors"
 	"go.viam.com/rdk/logging"
 )
 
@@ -50,9 +51,9 @@ func newRaspberryPiPowerSensor(ctx context.Context, logger logging.Logger, name 
 	return s, nil
 }
 
-func getRaspberryPiPowerSensors(ctx context.Context, logger logging.Logger) ([]powerSensor, error) {
+func GetPowerSensors(ctx context.Context, logger logging.Logger) ([]sensors.PowerSensor, error) {
 	components := []string{"core", "sdram_c", "sdram_i", "sdram_p"}
-	sensors := make([]powerSensor, 0)
+	sensors := make([]sensors.PowerSensor, 0)
 	for _, component := range components {
 		select {
 		case <-ctx.Done():

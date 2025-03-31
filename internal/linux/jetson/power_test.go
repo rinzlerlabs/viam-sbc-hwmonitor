@@ -1,4 +1,4 @@
-package voltages
+package jetson
 
 import (
 	"context"
@@ -16,7 +16,7 @@ func TestJetsonPowerSensors(t *testing.T) {
 	Test().RequiresBoardType(boardtype.NVIDIA).ShouldSkip(t)
 	logger := logging.NewTestLogger(t)
 	ctx := context.Background()
-	res, err := getJetsonPowerSensors(ctx, logger)
+	res, err := GetPowerSensors(ctx, logger)
 	require.NoError(t, err)
 	require.NotNil(t, res)
 	time.Sleep(1 * time.Second)

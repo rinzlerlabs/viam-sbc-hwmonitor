@@ -1,4 +1,4 @@
-package voltages
+package raspberrypi
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 
 	"github.com/rinzlerlabs/sbcidentify/boardtype"
 	. "github.com/rinzlerlabs/sbcidentify/test"
+	"github.com/rinzlerlabs/viam-sbc-hwmonitor/internal/sensors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.viam.com/rdk/logging"
@@ -16,7 +17,7 @@ func TestRaspberryPiPowerSensors(t *testing.T) {
 	Test().RequiresBoardType(boardtype.RaspberryPi).ShouldSkip(t)
 	logger := logging.NewTestLogger(t)
 	ctx := context.Background()
-	sensors, err := getRaspberryPiPowerSensors(ctx, logger)
+	sensors, err := GetPowerSensors(ctx, logger)
 	assert.NoError(t, err)
 	assert.NotNil(t, sensors)
 	for _, s := range sensors {
@@ -37,7 +38,7 @@ func TestRaspberryPiPowerSensors(t *testing.T) {
 	}
 }
 
-func waitForValues(t *testing.T, sensors []powerSensor) {
+func waitForValues(t *testing.T, sensors []sensors.PowerSensor) {
 	timeout := time.Now().Add(10 * time.Second)
 	for {
 		if time.Now().After(timeout) {

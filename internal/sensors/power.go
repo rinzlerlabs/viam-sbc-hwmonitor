@@ -1,6 +1,6 @@
-package voltages
+package sensors
 
-type powerSensor interface {
+type PowerSensor interface {
 	Close() error
 	GetReading() (voltage, current, power float64, err error)
 	GetReadingMap() (map[string]interface{}, error)

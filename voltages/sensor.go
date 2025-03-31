@@ -8,6 +8,7 @@ import (
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
 
+	"github.com/rinzlerlabs/viam-sbc-hwmonitor/internal/sensors"
 	"github.com/rinzlerlabs/viam-sbc-hwmonitor/utils"
 )
 
@@ -25,7 +26,7 @@ type Config struct {
 	logger     logging.Logger
 	cancelCtx  context.Context
 	cancelFunc func()
-	sensors    []powerSensor
+	sensors    []sensors.PowerSensor
 }
 
 func init() {

@@ -1,4 +1,4 @@
-package voltages
+package jetson
 
 import (
 	"context"
@@ -10,6 +10,7 @@ import (
 
 	"go.viam.com/rdk/logging"
 
+	"github.com/rinzlerlabs/viam-sbc-hwmonitor/internal/sensors"
 	"github.com/rinzlerlabs/viam-sbc-hwmonitor/utils"
 )
 
@@ -105,8 +106,8 @@ func newJetsonPowerSensor(ctx context.Context, logger logging.Logger, index int)
 	}, nil
 }
 
-func getJetsonPowerSensors(ctx context.Context, logger logging.Logger) ([]powerSensor, error) {
-	sensors := make([]powerSensor, 0)
+func GetPowerSensors(ctx context.Context, logger logging.Logger) ([]sensors.PowerSensor, error) {
+	sensors := make([]sensors.PowerSensor, 0)
 	matches, err := filepath.Glob("/sys/bus/i2c/drivers/ina3221/1-0040/hwmon/hwmon*/in*_label")
 	if err != nil {
 		return nil, err

@@ -3,12 +3,14 @@ BIN_PATH := bin
 BIN_NAME := rinzlerlabs-sbc-hwmonitor
 ENTRY_POINT := module.go
 VERSION_PATH := utils/version.go
-PLATFORM := linux/arm64  # Default platform for single-platform targets
-BUILD_TAGS ?=
+PLATFORM := $(shell go env GOOS)/$(shell go env GOARCH)
+PLATFORM_MONIKER := $(shell go env GOOS)-$(shell go env GOARCH)
+GOOS=linux
+GOARCH=arm64
 
 BIN := $(BIN_PATH)/$(BIN_NAME)
 PACKAGE_DIR := package
-PLATFORMS := linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64
+PACKAGE_NAME := $(BIN_NAME).tar.gz
 
 # === Dynamic Variables ===
 VERSION := $(shell grep 'Version' $(VERSION_PATH) | sed -E 's/.*Version\s*=\s*"([^"]+)".*/\1/')
@@ -20,73 +22,22 @@ ifneq ($(VERSION),$(GIT_VERSION))
 $(warning VERSION ($(VERSION)) and GIT_VERSION ($(GIT_VERSION)) do not match)
 endif
 
-# === Package Name Generator ===
-define PACKAGE_NAME
-$(BIN_NAME)_$(subst /,_,$(1)).tar.gz
-endef
+build:
+	@echo "Building $(BIN_NAME) for $(PLATFORM)..."
+	@GOOS=$(GOOS) GOARCH=$(GOARCH) \
+		go build -o $(BIN) $(ENTRY_POINT)
 
-# === Build Template ===
-define BUILD_TEMPLATE
-build_$(subst /,_,$(1)):
-	@echo "Building $(BIN_NAME) for $(1)..."
-	@GOOS=$(word 1,$(subst /, ,$(1))) GOARCH=$(word 2,$(subst /, ,$(1))) \
-		CGO_ENABLED=0 \
-		go build -tags=$(BUILD_TAGS) -o $(BIN) $(ENTRY_POINT)
-endef
-
-# === Package Template ===
-define PACKAGE_TEMPLATE
-package_$(subst /,_,$(1)): download-license build_$(subst /,_,$(1))
-	@echo "Packaging $(BIN_NAME) for $(1)..."
+package: build
+	@echo "Packaging $(BIN_NAME) for $(PLATFORM)..."
 	@mkdir -p $(PACKAGE_DIR)
-	@tar -czf $(PACKAGE_DIR)/$(call PACKAGE_NAME,$(1)) \
+	@tar -czf $(PACKAGE_DIR)/$(PACKAGE_NAME) \
 		$(BIN) meta.json gopsutil_LICENSE
-endef
-
-# === Upload Template ===
-define UPLOAD_TEMPLATE
-upload_$(subst /,_,$(1)): _package_$(subst /,_,$(1))
-	@if [ "$(VERSION)" != "$(GIT_VERSION)" ]; then \
-		echo "❌ VERSION ($(VERSION)) and GIT_VERSION ($(GIT_VERSION)) do not match."; \
-		exit 1; \
-	fi
-	@if ! git describe --exact-match --tags HEAD >/dev/null 2>&1; then \
-		echo "❌ HEAD is not tagged with $(VERSION). You must tag the latest commit before uploading."; \
-		exit 1; \
-	fi
-	@if ! git diff --quiet || ! git diff --cached --quiet; then \
-		echo "❌ Working directory has uncommitted changes. Please commit or stash them before uploading."; \
-		exit 1; \
-	fi
-	@echo "✅ Git checks passed. Uploading $(call PACKAGE_NAME,$(1)) for platform $(1)..."
-	@viam module update
-	@viam module upload --version=$(VERSION) --platform=$(1) $(PACKAGE_DIR)/$(call PACKAGE_NAME,$(1))
-	@echo "✅ Upload complete."
-endef
-
-
-# === Evaluate Templates ===
-$(foreach platform,$(PLATFORMS),$(eval $(call BUILD_TEMPLATE,$(platform))))
-$(foreach platform,$(PLATFORMS),$(eval $(call PACKAGE_TEMPLATE,$(platform))))
-$(foreach platform,$(PLATFORMS),$(eval $(call UPLOAD_TEMPLATE,$(platform))))
 
 # === Public Targets ===
-.PHONY: all build-all package-all upload-all \
-        build package upload \
+.PHONY: build package upload \
         clean clean-package download-license
 
 all: build
-
-build-all: $(foreach platform,$(PLATFORMS),build_$(subst /,_,$(platform)))
-package-all: $(foreach platform,$(PLATFORMS),package_$(subst /,_,$(platform)))
-upload-all: $(foreach platform,$(PLATFORMS),upload_$(subst /,_,$(platform)))
-
-# Single-platform targets (use PLATFORM=...)
-build:
-	$(MAKE) build_$(subst /,_,$(PLATFORM))
-
-package:
-	$(MAKE) package_$(subst /,_,$(PLATFORM))
 
 upload: package
 	@if [ "$(VERSION)" != "$(GIT_VERSION)" ]; then \
@@ -103,7 +54,7 @@ upload: package
     fi
 	@echo "✅ Git checks passed. Uploading..."
 	@viam module update
-	@viam module upload --version=$(VERSION) --platform=$(PLATFORM) $(PACKAGE_DIR)/$(call PACKAGE_NAME,$(PLATFORM))
+	@viam module upload --version=$(VERSION) --platform=$(PLATFORM) $(PACKAGE_DIR)/$(PACKAGE_NAME)
 	@echo "✅ Upload complete."
 
 # License downloader

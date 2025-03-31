@@ -5,124 +5,19 @@ name: Go
 
 on:
   push:
-  release:
-    types: [published]
-  pull_request_target:
-    branches: [ "main" ]
-permissions:
-  contents: write
-
-env:
-  binary_file_name: viam-raspi-sensors
+    tags:
+    - '[0-9]+.[0-9]+.[0-9]+'
 
 jobs:
-
-  build:
-    strategy:
-      matrix:
-        runner: [ ubuntu-latest ]
-        arch: [ arm64 ]
-    runs-on: ${{ matrix.runner }}
-    env:
-      os: ${{contains(matrix.runner, 'ubuntu') && 'linux' || contains(matrix.runner, 'macos') && 'macos' || 'unknown'}}
-      GOOS: ${{contains(matrix.runner, 'ubuntu') && 'linux' || contains(matrix.runner, 'macos') && 'darwin' || 'unknown'}}
-      GOARCH: ${{ matrix.arch }}
-    steps:
-    - name: Check out code
-      if: github.event_name != 'pull_request_target'
-      uses: actions/checkout@v3
-
-    - name: Check out PR branch code
-      if: github.event_name == 'pull_request_target'
-      uses: actions/checkout@v3
-      with:
-        ref: ${{ github.event.pull_request.head.sha }}
-        fetch-depth: 0
-    
-    - name: Set up Go
-      uses: actions/setup-go@v4
-      with:
-        go-version: '1.21'
-
-    - name: Build
-      run: go build -o ${{ env.binary_file_name }} -v .
-
-    - name: Package
-      run: tar -zcf ${{ env.binary_file_name }}-${{ env.os }}-${{ env.GOARCH }}.tar.gz ${{ env.binary_file_name }}
-    
-    - uses: actions/upload-artifact@v3
-      with:
-        name: ${{ env.binary_file_name }}-${{ env.os }}-${{ env.GOARCH }}
-        path: ${{ env.binary_file_name }}-${{ env.os }}-${{ env.GOARCH }}.tar.gz
-    - name: Upload Release Asset
-      uses: softprops/action-gh-release@v2
-      if: (startsWith(github.ref, 'refs/tags/') && github.event_name != 'release')
-      with:
-        draft: true
-        files: ${{ env.binary_file_name }}-${{ env.os }}-${{ env.GOARCH }}.tar.gz
-
-  test:
-    strategy:
-      matrix:
-        runner: [ ubuntu-latest ]
-        arch: [ amd64 ]
-    runs-on: ubuntu-latest
-    env:
-      os: ${{contains(matrix.runner, 'ubuntu') && 'linux' || contains(matrix.runner, 'macos') && 'macos' || 'unknown'}}
-      GOOS: ${{contains(matrix.runner, 'ubuntu') && 'linux' || contains(matrix.runner, 'macos') && 'darwin' || 'unknown'}}
-      GOARCH: ${{ matrix.arch }}
-    steps:
-    - name: Check out code
-      if: github.event_name != 'pull_request_target'
-      uses: actions/checkout@v3
-
-    - name: Check out PR branch code
-      if: github.event_name == 'pull_request_target'
-      uses: actions/checkout@v3
-      with:
-        ref: ${{ github.event.pull_request.head.sha }}
-        fetch-depth: 0
-
-    - name: Set up Go
-      uses: actions/setup-go@v4
-      with:
-        go-version: '1.21'
-    - name: Test
-      run: go test -v ./...
-
   publish:
-    strategy:
-      matrix:
-        runner: [ ubuntu-latest ]
-        arch: [ arm64 ]
     runs-on: ubuntu-latest
-    needs: [build, test]
-    env:
-      os: ${{contains(matrix.runner, 'ubuntu') && 'linux' || contains(matrix.runner, 'macos') && 'macos' || 'unknown'}}
-      GOOS: ${{contains(matrix.runner, 'ubuntu') && 'linux' || contains(matrix.runner, 'macos') && 'darwin' || 'unknown'}}
-      GOARCH: ${{ matrix.arch }}
-    if: github.event_name == 'release'
     steps:
-    - name: Check out code
-      if: github.event_name != 'pull_request_target'
-      uses: actions/checkout@v3
-
-    - name: Check out PR branch code
-      if: github.event_name == 'pull_request_target'
-      uses: actions/checkout@v3
+    - uses: actions/checkout@v3
+    - uses: viamrobotics/build-action@v1
       with:
-        ref: ${{ github.event.pull_request.head.sha }}
-        fetch-depth: 0
-
-    - uses: actions/download-artifact@v3
-      with:
-        name: ${{ env.binary_file_name }}-${{ env.os }}-${{ env.GOARCH }}
-    - name: Upload
-      uses: viamrobotics/upload-module@main
-      with:
-        module-path: ${{ env.binary_file_name }}-${{ env.os }}-${{ env.GOARCH }}.tar.gz
-        platform: ${{ env.GOOS }}/${{ env.GOARCH }}
-        org-id: 3a94d2f9-082b-44ad-8569-a9d8a1330050
-        version: ${{ github.event_name == 'release' && github.ref_name || format('0.0.0-{0}.{1}', github.ref_name, github.run_number) }} # <-- see 'Versioning' section below for explanation
+        # note: you can replace this line with 'version: ""' if you want to test the build process without deploying
+        # version: ${{ github.ref_name }}
+        version: ""
+        ref: ${{ github.sha }}
         key-id: ${{ secrets.viam_key_id }}
         key-value: ${{ secrets.viam_key_value }}

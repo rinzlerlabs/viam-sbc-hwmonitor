@@ -6,9 +6,8 @@ import (
 
 	"github.com/rinzlerlabs/sbcidentify"
 	"github.com/rinzlerlabs/sbcidentify/boardtype"
-	"github.com/rinzlerlabs/viam-sbc-hwmonitor/gpumonitor/gpusensor"
-	"github.com/rinzlerlabs/viam-sbc-hwmonitor/gpumonitor/jetson"
-	"github.com/rinzlerlabs/viam-sbc-hwmonitor/gpumonitor/nvidia"
+	"github.com/rinzlerlabs/viam-sbc-hwmonitor/internal/linux/jetson"
+	"github.com/rinzlerlabs/viam-sbc-hwmonitor/internal/sensors"
 	"go.viam.com/rdk/logging"
 )
 
@@ -26,14 +25,14 @@ type gpuMonitor interface {
 	// The readings are in the order they were found.
 	// The readings are not guaranteed to be in any particular order.
 	// The readings are guaranteed to be unique.
-	GetGPUStats(context.Context) (map[string][]gpusensor.GPUSensorReading, error)
+	GetGPUStats(context.Context) (map[string][]sensors.GPUSensorReading, error)
 }
 
 func newGpuMonitor(logger logging.Logger) (gpuMonitor, error) {
 	if sbcidentify.IsBoardType(boardtype.NVIDIA) {
 		return jetson.NewJetsonGpuMonitor(logger)
-	} else if nvidia.HasNvidiaSmiCommand(logger) {
-		return nvidia.NewNVIDIAGpuMonitor(logger)
+	} else if sensors.HasNvidiaSmiCommand(logger) {
+		return sensors.NewNVIDIAGpuMonitor(logger)
 	}
 	return nil, ErrUnsupportedBoard
 }

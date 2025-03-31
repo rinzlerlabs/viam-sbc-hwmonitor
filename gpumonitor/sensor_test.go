@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/rinzlerlabs/viam-sbc-hwmonitor/gpumonitor/gpusensor"
+	"github.com/rinzlerlabs/viam-sbc-hwmonitor/internal/sensors"
 	"github.com/stretchr/testify/require"
 	"go.viam.com/rdk/logging"
 )
@@ -28,10 +28,10 @@ func TestReadings(t *testing.T) {
 type mockGpuMonitor struct{}
 
 func (m *mockGpuMonitor) Close() error { return nil }
-func (m *mockGpuMonitor) GetGPUStats(context.Context) (map[string][]gpusensor.GPUSensorReading, error) {
-	return map[string][]gpusensor.GPUSensorReading{
+func (m *mockGpuMonitor) GetGPUStats(context.Context) (map[string][]sensors.GPUSensorReading, error) {
+	return map[string][]sensors.GPUSensorReading{
 		"gpu0": {
-			{Type: gpusensor.GPUReadingTypeClocksGraphics, Value: 1000},
+			{Type: sensors.GPUReadingTypeClocksGraphics, Value: 1000},
 		},
 	}, nil
 }

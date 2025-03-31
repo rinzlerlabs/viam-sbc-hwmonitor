@@ -1,4 +1,4 @@
-package gpusensor
+package sensors
 
 import "fmt"
 

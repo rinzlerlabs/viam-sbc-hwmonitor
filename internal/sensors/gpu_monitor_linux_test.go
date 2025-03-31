@@ -1,4 +1,4 @@
-package nvidia
+package sensors
 
 import (
 	"context"
@@ -38,7 +38,7 @@ func TestNvidiaGPU(t *testing.T) {
 }
 
 func TestNvidiaSmiParsing(t *testing.T) {
-	b, err := os.ReadFile("testdata/nvidia-smi.out")
+	b, err := os.ReadFile("testdata/nvidia-smi.txt")
 	require.NoError(t, err)
 	gpuMonitor := &nvidiaGpuMonitor{
 		logger: logging.NewTestLogger(t),

@@ -1,4 +1,4 @@
-package nvidia
+package sensors
 
 import (
 	"os/exec"

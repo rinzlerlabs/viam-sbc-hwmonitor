@@ -9,6 +9,7 @@ import (
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
 
+	"github.com/rinzlerlabs/viam-sbc-hwmonitor/internal/sensors"
 	"github.com/rinzlerlabs/viam-sbc-hwmonitor/utils"
 	viamutils "go.viam.com/utils"
 )
@@ -96,10 +97,10 @@ func (c *Config) Close(ctx context.Context) error {
 // It ensures if there are multiple readers of this sensor, it doesn't cause short samples
 func (c *Config) startUpdating(ctx context.Context) {
 	var err error
-	var lastStats map[string]CPUCoreStats
+	var lastStats map[string]sensors.CPUCoreStats
 	for {
 		if lastStats == nil {
-			lastStats, err = readCPUStats()
+			lastStats, err = sensors.ReadCPUStats()
 			if err != nil {
 				c.logger.Warnf("Failed to read CPU stats, skipping iteration: %v", err)
 				continue
@@ -109,7 +110,7 @@ func (c *Config) startUpdating(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-time.After(c.sleepTime):
-			currStats, err := readCPUStats()
+			currStats, err := sensors.ReadCPUStats()
 			if err != nil {
 				c.logger.Warnf("Failed to read CPU stats, skipping iteration: %v", err)
 				continue
@@ -121,7 +122,7 @@ func (c *Config) startUpdating(ctx context.Context) {
 					c.logger.Warnf("Core %s not found in current stats", core)
 					continue
 				}
-				usage := calculateUsage(prev, curr)
+				usage := sensors.CalculateUsage(prev, curr)
 				ret[core] = usage
 			}
 			lastStats = currStats

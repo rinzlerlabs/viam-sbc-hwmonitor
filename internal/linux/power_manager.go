@@ -11,8 +11,6 @@ type LinuxConfig struct {
 }
 
 type linuxPowerManager struct {
-	config *LinuxConfig
-	logger logging.Logger
 }
 
 func NewPowerManager(config *LinuxConfig, logger logging.Logger) (*linuxPowerManager, error) {

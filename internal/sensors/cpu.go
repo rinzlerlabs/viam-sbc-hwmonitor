@@ -22,8 +22,9 @@ func ReadCPUStats() (map[string]CPUCoreStats, error) {
 		return nil, err
 	}
 	stats := make(map[string]CPUCoreStats)
-
+	totalStats := CPUCoreStats{}
 	for _, stat := range rawStats {
+		// Add per-core stats
 		stats[stat.CPU] = CPUCoreStats{
 			User:    uint64(stat.User),
 			Nice:    uint64(stat.Nice),
@@ -34,7 +35,19 @@ func ReadCPUStats() (map[string]CPUCoreStats, error) {
 			SoftIRQ: uint64(stat.Softirq),
 			Steal:   uint64(stat.Steal),
 		}
+
+		// Add total stats
+		totalStats.User += uint64(stat.User)
+		totalStats.Nice += uint64(stat.Nice)
+		totalStats.System += uint64(stat.System)
+		totalStats.Idle += uint64(stat.Idle)
+		totalStats.IOWait += uint64(stat.Iowait)
+		totalStats.IRQ += uint64(stat.Irq)
+		totalStats.SoftIRQ += uint64(stat.Softirq)
+		totalStats.Steal += uint64(stat.Steal)
 	}
+
+	stats["cpu"] = totalStats
 
 	return stats, nil
 }

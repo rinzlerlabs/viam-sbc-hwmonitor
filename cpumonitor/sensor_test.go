@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.viam.com/rdk/logging"
 	viamutils "go.viam.com/utils"
 )
@@ -14,7 +15,8 @@ import (
 func TestCaptureCPUStats(t *testing.T) {
 	logger := logging.NewTestLogger(t)
 	sensor := &Config{
-		logger: logger,
+		logger:    logger,
+		sleepTime: 1 * time.Second,
 	}
 
 	sensor.workers = viamutils.NewBackgroundStoppableWorkers(sensor.startUpdating)
@@ -25,13 +27,17 @@ func TestCaptureCPUStats(t *testing.T) {
 		}
 	}
 	sensor.Close(context.Background())
-	assert.Equal(t, runtime.NumCPU()+1, len(sensor.reading))
+	require.Equal(t, runtime.NumCPU()+1, len(sensor.reading))
+	for k, v := range sensor.reading {
+		logger.Infof("%v: %v", k, v)
+	}
 }
 
 func TestCaptureCPUStatsExitsImmediately(t *testing.T) {
 	logger := logging.NewTestLogger(t)
 	sensor := &Config{
-		logger: logger,
+		logger:    logger,
+		sleepTime: 1 * time.Second,
 	}
 
 	sensor.workers = viamutils.NewBackgroundStoppableWorkers(sensor.startUpdating)

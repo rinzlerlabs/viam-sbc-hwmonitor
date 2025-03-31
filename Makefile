@@ -27,7 +27,7 @@ build:
 	@GOOS=$(GOOS) GOARCH=$(GOARCH) \
 		go build -o $(BIN) $(ENTRY_POINT)
 
-package: build
+package: build download-license
 	@echo "Packaging $(BIN_NAME) for $(PLATFORM)..."
 	@mkdir -p $(PACKAGE_DIR)
 	@tar -czf $(PACKAGE_DIR)/$(PACKAGE_NAME) \

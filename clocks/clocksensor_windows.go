@@ -3,10 +3,10 @@ package clocks
 import (
 	"context"
 
-	"github.com/rinzlerlabs/viam-sbc-hwmonitor/utils"
+	"github.com/rinzlerlabs/viam-sbc-hwmonitor/internal/sensors"
 	"go.viam.com/rdk/logging"
 )
 
-func getClockSensors(ctx context.Context, logger logging.Logger) ([]ClockSensor, error) {
-	return nil, utils.ErrPlatformNotSupported
+func getClockSensors(ctx context.Context, logger logging.Logger) ([]sensors.ClockSensor, error) {
+	return genericwindows.GetClockSensors(ctx, logger)
 }

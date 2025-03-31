@@ -4,8 +4,8 @@ import (
 	"errors"
 
 	"github.com/rinzlerlabs/sbcidentify"
-	"github.com/rinzlerlabs/viam-sbc-hwmonitor/internal/jetson"
-	"github.com/rinzlerlabs/viam-sbc-hwmonitor/internal/raspberrypi"
+	"github.com/rinzlerlabs/viam-sbc-hwmonitor/internal/linux/jetson"
+	"github.com/rinzlerlabs/viam-sbc-hwmonitor/internal/linux/raspberrypi"
 	"github.com/rinzlerlabs/viam-sbc-hwmonitor/utils"
 	"go.viam.com/rdk/logging"
 )

@@ -99,8 +99,8 @@ func newNvidiaJetsonGpuClockSensor(ctx context.Context, logger logging.Logger) *
 	}
 }
 
-func GetClockSensors(ctx context.Context, logger logging.Logger) ([]*jetsonClockSensor, error) {
-	s := make([]*jetsonClockSensor, 0)
+func GetClockSensors(ctx context.Context, logger logging.Logger) ([]sensors.ClockSensor, error) {
+	s := make([]sensors.ClockSensor, 0)
 	sysFsCpus, err := sensors.GetSysFsCpuPaths()
 	if err != nil {
 		return nil, err

@@ -1,4 +1,4 @@
-package genericwindows
+package windows
 
 import (
 	"errors"
@@ -6,6 +6,14 @@ import (
 	"github.com/rinzlerlabs/viam-sbc-hwmonitor/utils"
 	"go.viam.com/rdk/logging"
 )
+
+type WindowsConfig struct {
+}
+
+type windowsPowerManager struct {
+	config *WindowsConfig
+	logger logging.Logger
+}
 
 func NewPowerManager(config *WindowsConfig, logger logging.Logger) (*windowsPowerManager, error) {
 	if config == nil {

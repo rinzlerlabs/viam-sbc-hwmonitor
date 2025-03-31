@@ -1,4 +1,4 @@
-package genericwindows
+package linux
 
 import (
 	"context"

@@ -111,8 +111,8 @@ func (s *raspberryPiClockSensor) Name() string {
 	return s.name
 }
 
-func getRaspberryPi4ClockSensors(ctx context.Context, logger logging.Logger) []*raspberryPiClockSensor {
-	sensors := make([]*raspberryPiClockSensor, 0)
+func getRaspberryPi4ClockSensors(ctx context.Context, logger logging.Logger) []sensors.ClockSensor {
+	sensors := make([]sensors.ClockSensor, 0)
 	for _, name := range raspi4Clocks {
 		sensor := newRaspberryPiVcgencmdSensor(ctx, logger, name)
 		sensors = append(sensors, sensor)
@@ -120,8 +120,8 @@ func getRaspberryPi4ClockSensors(ctx context.Context, logger logging.Logger) []*
 	return sensors
 }
 
-func getRaspberryPi5ClockSensors(ctx context.Context, logger logging.Logger) []*raspberryPiClockSensor {
-	sensors := make([]*raspberryPiClockSensor, 0)
+func getRaspberryPi5ClockSensors(ctx context.Context, logger logging.Logger) []sensors.ClockSensor {
+	sensors := make([]sensors.ClockSensor, 0)
 	for _, name := range raspi5Clocks {
 		sensor := newRaspberryPiVcgencmdSensor(ctx, logger, name)
 		sensors = append(sensors, sensor)
@@ -154,8 +154,8 @@ func newRaspberryPiSysFsSensor(ctx context.Context, logger logging.Logger, path 
 	}
 }
 
-func GetClockSensors(ctx context.Context, logger logging.Logger) ([]*raspberryPiClockSensor, error) {
-	s := make([]*raspberryPiClockSensor, 0)
+func GetClockSensors(ctx context.Context, logger logging.Logger) ([]sensors.ClockSensor, error) {
+	s := make([]sensors.ClockSensor, 0)
 	if sbcidentify.IsBoardType(boardtype.RaspberryPi5) {
 		s = append(s, getRaspberryPi5ClockSensors(ctx, logger)...)
 	} else if sbcidentify.IsBoardType(boardtype.RaspberryPi4) {

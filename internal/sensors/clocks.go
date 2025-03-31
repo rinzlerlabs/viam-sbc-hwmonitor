@@ -11,6 +11,12 @@ import (
 	"github.com/rinzlerlabs/viam-sbc-hwmonitor/utils"
 )
 
+type ClockSensor interface {
+	Close() error
+	GetReadingMap() (map[string]interface{}, error)
+	Name() string
+}
+
 func GetSysFsClock(ctx context.Context, path string) (int64, error) {
 	return readIntFromFile(ctx, path)
 }

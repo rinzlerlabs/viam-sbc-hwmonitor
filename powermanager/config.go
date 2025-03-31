@@ -1,8 +1,8 @@
 package powermanager
 
 import (
-	"github.com/rinzlerlabs/viam-sbc-hwmonitor/internal/jetson"
-	"github.com/rinzlerlabs/viam-sbc-hwmonitor/internal/raspberrypi"
+	"github.com/rinzlerlabs/viam-sbc-hwmonitor/internal/linux/jetson"
+	"github.com/rinzlerlabs/viam-sbc-hwmonitor/internal/linux/raspberrypi"
 )
 
 type ComponentConfig struct {

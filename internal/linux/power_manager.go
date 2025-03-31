@@ -1,4 +1,4 @@
-package genericlinux
+package linux
 
 import (
 	"errors"
@@ -6,6 +6,14 @@ import (
 	"github.com/rinzlerlabs/viam-sbc-hwmonitor/utils"
 	"go.viam.com/rdk/logging"
 )
+
+type LinuxConfig struct {
+}
+
+type linuxPowerManager struct {
+	config *LinuxConfig
+	logger logging.Logger
+}
 
 func NewPowerManager(config *LinuxConfig, logger logging.Logger) (*linuxPowerManager, error) {
 	if config == nil {

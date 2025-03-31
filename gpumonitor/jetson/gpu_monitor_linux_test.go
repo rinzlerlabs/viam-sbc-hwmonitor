@@ -1,4 +1,4 @@
-package gpumonitor
+package jetson
 
 import (
 	"context"
@@ -15,7 +15,7 @@ func TestJetsonGpuGetsFrequencies(t *testing.T) {
 	Test().RequiresBoardType(boardtype.NVIDIA).ShouldSkip(t)
 	ctx := context.Background()
 	logger := logging.NewTestLogger(t)
-	jetson, err := newJetsonGpuMonitor(logger)
+	jetson, err := NewJetsonGpuMonitor(logger)
 	require.NoError(t, err)
 	gpuStats, err := jetson.GetGPUStats(ctx)
 	require.NoError(t, err)
@@ -27,26 +27,4 @@ func TestJetsonGpuGetsFrequencies(t *testing.T) {
 			assert.NotEmpty(t, stat.Type)
 		}
 	}
-}
-
-func TestJetsonGpu_Readings(t *testing.T) {
-	Test().RequiresBoardType(boardtype.NVIDIA).ShouldSkip(t)
-	ctx := context.Background()
-	logger := logging.NewTestLogger(t)
-	jetson, err := newJetsonGpuMonitor(logger)
-	require.NoError(t, err)
-	stats, err := jetson.GetGPUStats(ctx)
-	require.NoError(t, err)
-	require.NotNil(t, stats)
-	require.Len(t, stats, 7)
-	mon, err := newGpuMonitor(logger)
-	require.NoError(t, err)
-	sensor := &Config{
-		logger:     logger,
-		gpuMonitor: mon,
-	}
-	res, err := sensor.Readings(ctx, nil)
-	require.NoError(t, err)
-	require.NotNil(t, res)
-	logger.Infof("Readings: %#v", res)
 }

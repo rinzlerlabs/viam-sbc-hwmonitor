@@ -7,64 +7,34 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	"go.viam.com/rdk/logging"
 )
 
 type raspberryPiPowerSensor struct {
-	logger     logging.Logger
-	mu         sync.RWMutex
-	wg         sync.WaitGroup
-	name       string
-	cancelCtx  context.Context
-	cancelFunc context.CancelFunc
-	updateTask func()
-	voltage    float64
-	current    float64
-	power      float64
+	logger logging.Logger
+	mu     sync.RWMutex
+	name   string
 }
 
-func (s *raspberryPiPowerSensor) StartUpdating() error {
-	updateInterval := 1 * time.Second
-	s.updateTask = func() {
-		s.wg.Add(1)
-		defer s.wg.Done()
-		for {
-			select {
-			case <-s.cancelCtx.Done():
-				return
-			case <-time.After(updateInterval):
-				voltage, err := getRaspberryPiComponentVoltage(s.name)
-				if err != nil {
-					s.logger.Errorf("failed to get voltage: %v", err)
-					continue
-				}
-				s.mu.Lock()
-				s.voltage = voltage
-				s.mu.Unlock()
-			}
-		}
-	}
-	go s.updateTask()
+func (s *raspberryPiPowerSensor) Close() error {
 	return nil
 }
 
-func (s *raspberryPiPowerSensor) Close() {
-}
-
-func (s *raspberryPiPowerSensor) GetReading() (voltage, current, power float64) {
+func (s *raspberryPiPowerSensor) GetReading() (voltage, current, power float64, err error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.voltage, s.current, s.power
+	voltage, err = getRaspberryPiComponentVoltage(s.name)
+	return
 }
 
-func (s *raspberryPiPowerSensor) GetReadingMap() map[string]interface{} {
+func (s *raspberryPiPowerSensor) GetReadingMap() (map[string]interface{}, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+	voltage, err := getRaspberryPiComponentVoltage(s.name)
 	return map[string]interface{}{
-		"voltage": s.voltage,
-	}
+		"voltage": voltage,
+	}, err
 }
 
 func (s *raspberryPiPowerSensor) GetName() string {
@@ -73,12 +43,9 @@ func (s *raspberryPiPowerSensor) GetName() string {
 
 func newRaspberryPiPowerSensor(ctx context.Context, logger logging.Logger, name string) (*raspberryPiPowerSensor, error) {
 	logger.Infof("Creating Raspberry Pi power sensor for %s", name)
-	cancelCtx, cancelFunc := context.WithCancel(ctx)
 	s := &raspberryPiPowerSensor{
-		logger:     logger,
-		name:       name,
-		cancelCtx:  cancelCtx,
-		cancelFunc: cancelFunc,
+		logger: logger,
+		name:   name,
 	}
 	return s, nil
 }

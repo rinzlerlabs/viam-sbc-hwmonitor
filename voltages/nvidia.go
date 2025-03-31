@@ -4,11 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
 	"path/filepath"
 	"strings"
 	"sync"
-	"time"
 
 	"go.viam.com/rdk/logging"
 
@@ -22,97 +20,66 @@ var (
 type jetsonPowerSensor struct {
 	logger                       logging.Logger
 	mu                           sync.RWMutex
-	wg                           sync.WaitGroup
 	index                        int
 	name                         string
 	cancelCtx                    context.Context
 	cancelFunc                   context.CancelFunc
-	updateTask                   func()
 	voltageFile                  string
 	currentFile                  string
 	overCurrentAlarmFile         string
 	criticalOverCurrentAlarmFile string
-	voltage                      float64
-	current                      float64
-	power                        float64
-	overCurrentAlarm             bool
-	criticalOverCurrentAlarm     bool
 }
 
-func (s *jetsonPowerSensor) StartUpdating() error {
-	updateInterval := 1 * time.Second
-	ui, err := utils.ReadInt64FromFileWithContext(s.cancelCtx, "/sys/bus/i2c/drivers/ina3221/1-0040/hwmon/hwmon1/update_interval")
-	if err == nil {
-		updateInterval = time.Duration(ui) * time.Second
-	}
-	s.updateTask = func() {
-		s.wg.Add(1)
-		defer s.wg.Done()
-		for {
-			select {
-			case <-s.cancelCtx.Done():
-				s.logger.Infof("Stopping background update for %s", s.name)
-				return
-			case <-time.After(updateInterval):
-				rawVoltage, vErr := utils.ReadInt64FromFileWithContext(s.cancelCtx, s.voltageFile)
-				rawCurrent, cErr := utils.ReadInt64FromFileWithContext(s.cancelCtx, s.currentFile)
-				overCurrentAlarm, ocaErr := utils.ReadBoolFromFileWithContext(s.cancelCtx, s.overCurrentAlarmFile)
-				criticalOverCurrentAlarm, cocaErr := utils.ReadBoolFromFileWithContext(s.cancelCtx, s.criticalOverCurrentAlarmFile)
-				current := float64(rawCurrent) / 1000
-				voltage := float64(rawVoltage) / 1000
-				s.logger.Debugf("Voltage: %v, Current: %v, OverCurrentAlarm: %v, CriticalOverCurrentAlarm: %v", voltage, current, overCurrentAlarm, criticalOverCurrentAlarm)
-				s.mu.Lock()
-				if vErr == nil {
-					s.voltage = voltage
-				}
-				if cErr == nil {
-					s.current = current
-				}
-				if vErr == nil && cErr == nil {
-					s.power = math.Round(voltage*current*100) / 100
-				}
-				if ocaErr == nil {
-					s.overCurrentAlarm = overCurrentAlarm
-				}
-				if cocaErr == nil {
-					s.criticalOverCurrentAlarm = criticalOverCurrentAlarm
-				}
-				s.mu.Unlock()
-			}
-		}
-
-	}
-	go s.updateTask()
-	return nil
-}
-
-func (s *jetsonPowerSensor) Close() {
+func (s *jetsonPowerSensor) Close() error {
 	s.logger.Infof("Shutting down %s", s.name)
 	s.cancelFunc()
-	s.wg.Wait()
 	s.logger.Infof("Shutdown complete")
+	return nil
 }
 
 func (s *jetsonPowerSensor) GetName() string {
 	return s.name
 }
 
-func (s *jetsonPowerSensor) GetReading() (voltage, current, power float64) {
+func (s *jetsonPowerSensor) GetReading() (voltage, current, power float64, err error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.voltage, s.current, s.power
+	rawVoltage, err := utils.ReadInt64FromFileWithContext(s.cancelCtx, s.voltageFile)
+	if err != nil {
+		return 0, 0, 0, err
+	}
+	rawCurrent, err := utils.ReadInt64FromFileWithContext(s.cancelCtx, s.currentFile)
+	if err != nil {
+		return 0, 0, 0, err
+	}
+
+	current = float64(rawCurrent) / 1000
+	voltage = float64(rawVoltage) / 1000
+	return voltage, current, voltage * current, nil
 }
 
-func (s *jetsonPowerSensor) GetReadingMap() map[string]interface{} {
+func (s *jetsonPowerSensor) GetReadingMap() (map[string]interface{}, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return map[string]interface{}{
-		"voltage":               s.voltage,
-		"current":               s.current,
-		"power":                 s.power,
-		"over_current_alarm":    s.overCurrentAlarm,
-		"critical_over_current": s.criticalOverCurrentAlarm,
+	current, voltage, power, err := s.GetReading()
+	if err != nil {
+		return nil, err
 	}
+	overCurrentAlarm, err := utils.ReadBoolFromFileWithContext(s.cancelCtx, s.overCurrentAlarmFile)
+	if err != nil {
+		return nil, err
+	}
+	criticalOverCurrentAlarm, err := utils.ReadBoolFromFileWithContext(s.cancelCtx, s.criticalOverCurrentAlarmFile)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]interface{}{
+		"voltage":               voltage,
+		"current":               current,
+		"power":                 power,
+		"over_current_alarm":    overCurrentAlarm,
+		"critical_over_current": criticalOverCurrentAlarm,
+	}, nil
 }
 
 func newJetsonPowerSensor(ctx context.Context, logger logging.Logger, index int) (*jetsonPowerSensor, error) {
@@ -159,7 +126,6 @@ func getJetsonPowerSensors(ctx context.Context, logger logging.Logger) ([]powerS
 		if err != nil {
 			return nil, err
 		}
-		sensor.StartUpdating()
 		sensors = append(sensors, sensor)
 	}
 	return sensors, nil

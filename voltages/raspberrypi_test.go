@@ -8,6 +8,7 @@ import (
 	"github.com/rinzlerlabs/sbcidentify/boardtype"
 	. "github.com/rinzlerlabs/sbcidentify/test"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.viam.com/rdk/logging"
 )
 
@@ -20,12 +21,12 @@ func TestRaspberryPiPowerSensors(t *testing.T) {
 	assert.NotNil(t, sensors)
 	for _, s := range sensors {
 		assert.NotNil(t, s)
-		assert.NoError(t, s.StartUpdating())
 	}
 	waitForValues(t, sensors)
 	for _, s := range sensors {
 		assert.NotNil(t, s)
-		m := s.GetReadingMap()
+		m, err := s.GetReadingMap()
+		require.NoError(t, err)
 		assert.NotNil(t, m)
 		for k, v := range m {
 			logger.Infof("%s: %v", k, v)
@@ -44,7 +45,8 @@ func waitForValues(t *testing.T, sensors []powerSensor) {
 		}
 		allHaveValues := true
 		for _, s := range sensors {
-			m := s.GetReadingMap()
+			m, err := s.GetReadingMap()
+			require.NoError(t, err)
 			if len(m) == 0 {
 				allHaveValues = false
 			}

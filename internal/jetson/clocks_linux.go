@@ -1,83 +1,54 @@
-//go:build linux
-// +build linux
-
-package clocks
+package jetson
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
-	"time"
 
+	"github.com/rinzlerlabs/viam-sbc-hwmonitor/internal/sensors"
 	"go.viam.com/rdk/logging"
 )
 
 type jetsonClockSensor struct {
 	logger     logging.Logger
 	mu         sync.RWMutex
-	wg         sync.WaitGroup
 	name       string
 	cancelCtx  context.Context
 	cancelFunc context.CancelFunc
-	updateTask func()
-	frequency  int64
 	sensorType string
 	path       string
 }
 
-func (s *jetsonClockSensor) Close() {
+func (s *jetsonClockSensor) Close() error {
 	s.cancelFunc()
-	s.wg.Wait()
+	return nil
 }
 
 func (s *jetsonClockSensor) Name() string {
 	return s.name
 }
 
-func (s *jetsonClockSensor) GetReadingMap() map[string]interface{} {
+func (s *jetsonClockSensor) GetReadingMap() (map[string]interface{}, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+	var frequency int64
+	var err error
+	switch s.sensorType {
+	case "sysfs":
+		frequency, err = s.readSysfsClock()
+	default:
+		return nil, errors.New("unknown sensor type")
+	}
 	return map[string]interface{}{
-		s.name: s.frequency,
-	}
-}
-
-func (s *jetsonClockSensor) StartUpdating() error {
-	updateInterval := 1 * time.Second
-	s.updateTask = func() {
-		s.wg.Add(1)
-		defer s.wg.Done()
-		for {
-			select {
-			case <-s.cancelCtx.Done():
-				return
-			case <-time.After(updateInterval):
-				s.logger.Debug("Updating clock frequency")
-				var frequency int64
-				var err error
-				switch s.sensorType {
-				case "sysfs":
-					frequency, err = s.readSysfsClock()
-				}
-				if err != nil {
-					s.logger.Errorf("failed to read clock frequency: %v", err)
-					continue
-				}
-				s.mu.Lock()
-				s.frequency = frequency
-				s.mu.Unlock()
-				s.logger.Debugf("Updated clock frequency: %d", frequency)
-			}
-		}
-	}
-	go s.updateTask()
-	return nil
+		s.name: frequency,
+	}, err
 }
 
 func (s *jetsonClockSensor) readSysfsClock() (int64, error) {
-	current, err := getSysFsClock(s.cancelCtx, s.path)
+	current, err := sensors.GetSysFsClock(s.cancelCtx, s.path)
 	if err != nil {
 		s.logger.Errorw("failed to read sysfs clock", "sensor", s.name, "error", err)
 		return 0, err
@@ -128,16 +99,16 @@ func newNvidiaJetsonGpuClockSensor(ctx context.Context, logger logging.Logger) *
 	}
 }
 
-func getNvidiaJetsonClockSensors(ctx context.Context, logger logging.Logger) ([]clockSensor, error) {
-	sensors := make([]clockSensor, 0)
-	sysFsCpus, err := getSysFsCpuPaths()
+func GetClockSensors(ctx context.Context, logger logging.Logger) ([]*jetsonClockSensor, error) {
+	s := make([]*jetsonClockSensor, 0)
+	sysFsCpus, err := sensors.GetSysFsCpuPaths()
 	if err != nil {
 		return nil, err
 	}
 	for _, cpu := range sysFsCpus {
 		sensor := newNvidiaJetsonCpuClockSensor(ctx, logger, cpu)
-		sensors = append(sensors, sensor)
+		s = append(s, sensor)
 	}
-	sensors = append(sensors, newNvidiaJetsonGpuClockSensor(ctx, logger))
-	return sensors, nil
+	s = append(s, newNvidiaJetsonGpuClockSensor(ctx, logger))
+	return s, nil
 }

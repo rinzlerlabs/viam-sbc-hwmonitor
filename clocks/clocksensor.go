@@ -1,8 +1,7 @@
 package clocks
 
-type clockSensor interface {
-	StartUpdating() error
-	Close()
-	GetReadingMap() map[string]interface{}
+type ClockSensor interface {
+	Close() error
+	GetReadingMap() (map[string]interface{}, error)
 	Name() string
 }

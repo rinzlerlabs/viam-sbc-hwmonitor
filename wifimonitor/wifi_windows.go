@@ -1,7 +1,4 @@
-//go:build nobuild
-// +build nobuild
-
-package wifi_monitor
+package wifimonitor
 
 import (
 	"bufio"

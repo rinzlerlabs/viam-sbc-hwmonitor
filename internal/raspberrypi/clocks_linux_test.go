@@ -1,7 +1,4 @@
-//go:build linux
-// +build linux
-
-package clocks
+package raspberrypi
 
 import (
 	"context"
@@ -19,7 +16,7 @@ func TestGetRaspPiClockSensorsReturnsAllSensors(t *testing.T) {
 	Test().RequiresBoardType(boardtype.RaspberryPi4).ShouldSkip(t)
 	logger := logging.NewTestLogger(t)
 	ctx := context.Background()
-	clocks, err := getRaspberryPiClockSensors(ctx, logger)
+	clocks, err := GetClockSensors(ctx, logger)
 	assert.NoError(t, err)
 	assert.NotNil(t, clocks)
 	assert.Equal(t, runtime.NumCPU()+12, len(clocks))

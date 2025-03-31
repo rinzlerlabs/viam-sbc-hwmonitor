@@ -75,12 +75,6 @@ func (c *Config) Reconfigure(ctx context.Context, _ resource.Dependencies, conf 
 	}
 	c.sensors = sensors
 
-	for _, sensor := range c.sensors {
-		if err := sensor.StartUpdating(); err != nil {
-			return err
-		}
-	}
-
 	return nil
 }
 
@@ -90,7 +84,12 @@ func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (ma
 	ret := make(map[string]interface{})
 	for _, s := range c.sensors {
 		name := s.GetName()
-		for k, v := range s.GetReadingMap() {
+		readings, err := s.GetReadingMap()
+		if err != nil {
+			c.logger.Warnf("Failed to get readings from %s: %v", name, err)
+			continue
+		}
+		for k, v := range readings {
 			ret[name+"_"+k] = v
 		}
 	}

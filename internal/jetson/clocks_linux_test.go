@@ -1,7 +1,4 @@
-//go:build linux
-// +build linux
-
-package clocks
+package jetson
 
 import (
 	"context"
@@ -16,7 +13,7 @@ import (
 func TestGetNvidiaClockSensorsReturnsAllSensors(t *testing.T) {
 	logger := logging.NewTestLogger(t)
 	ctx := context.Background()
-	clocks, err := getNvidiaJetsonClockSensors(ctx, logger)
+	clocks, err := GetClockSensors(ctx, logger)
 	assert.NoError(t, err)
 	assert.NotNil(t, clocks)
 	assert.Equal(t, runtime.NumCPU()+1, len(clocks))

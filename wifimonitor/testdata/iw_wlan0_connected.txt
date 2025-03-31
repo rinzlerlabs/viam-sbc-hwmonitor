@@ -1,0 +1,12 @@
+Connected to a1:b2:c3:d4:e5:f6 (on wlan0)
+	SSID: MyWiFiNetwork
+	freq: 2412
+	RX: 101232 bytes (800 packets)
+	TX: 154382 bytes (1124 packets)
+	signal: -65 dBm
+	rx bitrate: 52.0 MBit/s MCS 7 short GI
+	tx bitrate: 72.2 MBit/s MCS 7 short GI
+
+	bss flags:	short-slot-time
+	dtim period:	2
+	beacon int:	100

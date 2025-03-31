@@ -1,4 +1,4 @@
-package gpumonitor
+package nvidia
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 
 func skipIfNoNvidiaDriver(t *testing.T) {
 	logger := logging.NewTestLogger(t)
-	if hasNvidiaSmiCommand(logger) == false {
+	if HasNvidiaSmiCommand(logger) == false {
 		t.Skipf("This test requires an NVIDIA gpu and the nvidia-smi command to be present")
 	}
 }
@@ -20,7 +20,7 @@ func TestNvidiaGPU(t *testing.T) {
 	skipIfNoNvidiaDriver(t)
 	ctx := context.Background()
 	logger := logging.NewTestLogger(t)
-	monitor, err := newNVIDIAGpuMonitor(logger)
+	monitor, err := NewNVIDIAGpuMonitor(logger)
 	require.NoError(t, err)
 	require.NotNil(t, monitor)
 	stats, err := monitor.GetGPUStats(ctx)

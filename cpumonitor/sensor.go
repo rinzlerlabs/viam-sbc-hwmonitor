@@ -10,6 +10,7 @@ import (
 	"go.viam.com/rdk/resource"
 
 	"github.com/rinzlerlabs/viam-sbc-hwmonitor/utils"
+	viamutils "go.viam.com/utils"
 )
 
 var (
@@ -22,14 +23,12 @@ var (
 
 type Config struct {
 	resource.Named
-	wg         sync.WaitGroup
-	mu         sync.RWMutex
-	logger     logging.Logger
-	cancelCtx  context.Context
-	cancelFunc func()
-	task       func()
-	stats      map[string]interface{}
-	sleepTime  time.Duration
+	readingsLock sync.RWMutex
+	configLock   sync.Mutex
+	logger       logging.Logger
+	sleepTime    time.Duration
+	workers      *viamutils.StoppableWorkers
+	reading      map[string]interface{}
 }
 
 func init() {
@@ -41,15 +40,11 @@ func init() {
 
 func NewSensor(ctx context.Context, deps resource.Dependencies, conf resource.Config, logger logging.Logger) (sensor.Sensor, error) {
 	logger.Infof("Starting %s %s", PrettyName, Version)
-	cancelCtx, cancelFunc := context.WithCancel(context.Background())
-
 	b := Config{
-		Named:      conf.ResourceName().AsNamed(),
-		logger:     logger,
-		cancelCtx:  cancelCtx,
-		cancelFunc: cancelFunc,
-		mu:         sync.RWMutex{},
-		stats:      make(map[string]interface{}),
+		Named:        conf.ResourceName().AsNamed(),
+		logger:       logger,
+		readingsLock: sync.RWMutex{},
+		configLock:   sync.Mutex{},
 	}
 
 	if err := b.Reconfigure(ctx, deps, conf); err != nil {
@@ -60,74 +55,58 @@ func NewSensor(ctx context.Context, deps resource.Dependencies, conf resource.Co
 	return &b, nil
 }
 
-func (c *Config) Reconfigure(ctx context.Context, _ resource.Dependencies, conf resource.Config) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+func (c *Config) Reconfigure(ctx context.Context, _ resource.Dependencies, rawConf resource.Config) error {
+	c.configLock.Lock()
+	defer c.configLock.Unlock()
 	c.logger.Infof("Reconfiguring %s", PrettyName)
-	if c.cancelFunc != nil {
-		c.cancelFunc()
-	}
-	c.logger.Debugf("Waiting for background task to stop")
-	c.wg.Wait()
+	c.logger.Debug("Stopping background worker")
+	c.workers.Stop()
+	c.logger.Debugf("Background worker stopped")
 
-	// Reset stats
-	c.stats = make(map[string]interface{})
-
-	c.cancelCtx, c.cancelFunc = context.WithCancel(context.Background())
-
-	newConf, err := resource.NativeConfig[*ComponentConfig](conf)
+	conf, err := resource.NativeConfig[*ComponentConfig](rawConf)
 	if err != nil {
 		return err
 	}
 
 	// In case the component has changed name
-	c.Named = conf.ResourceName().AsNamed()
-	c.sleepTime = 1 * time.Second
-	if newConf.SleepTimeMs > 0 {
-		c.sleepTime = time.Duration(newConf.SleepTimeMs) * time.Millisecond
-	}
-	c.task = c.captureCPUStats
-	go c.task()
+	c.Named = rawConf.ResourceName().AsNamed()
+	c.sleepTime = time.Duration(conf.SleepTimeMs * int(time.Millisecond))
+	c.workers = viamutils.NewBackgroundStoppableWorkers(c.startUpdating)
+
 	c.logger.Debugf("Reconfigure complete %s", PrettyName)
 	return nil
 }
 
 func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	return c.stats, nil
+	c.readingsLock.RLock()
+	defer c.readingsLock.RUnlock()
+	return c.reading, nil
 }
 
 func (c *Config) Close(ctx context.Context) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.logger.Info("shutting down")
-	c.cancelFunc()
-	c.wg.Wait()
-	c.logger.Info("shutdown complete")
+	c.configLock.Lock()
+	defer c.configLock.Unlock()
+	c.logger.Infof("Shutting down %v", PrettyName)
+	c.workers.Stop()
+	c.logger.Infof("%v Shutdown complete", PrettyName)
 	return nil
 }
 
-func (c *Config) Ready(ctx context.Context, extra map[string]interface{}) (bool, error) {
-	return false, nil
-}
-
-func (c *Config) captureCPUStats() {
-	c.wg.Add(1)
-	defer c.wg.Done()
-
-	c.logger.Debug("starting CPU stats loop")
-	defer c.logger.Debug("CPU stats loop stopped")
-
-	lastStats, err := readCPUStats()
-	if err != nil {
-		c.logger.Errorf("Failed to read CPU stats: %v", err)
-		return
-	}
-
+// startUpdating is a goroutine that updates the CPU stats every sleepTime
+// It ensures if there are multiple readers of this sensor, it doesn't cause short samples
+func (c *Config) startUpdating(ctx context.Context) {
+	var err error
+	var lastStats map[string]CPUCoreStats
 	for {
+		if lastStats == nil {
+			lastStats, err = readCPUStats()
+			if err != nil {
+				c.logger.Warnf("Failed to read CPU stats, skipping iteration: %v", err)
+				continue
+			}
+		}
 		select {
-		case <-c.cancelCtx.Done():
+		case <-ctx.Done():
 			return
 		case <-time.After(c.sleepTime):
 			currStats, err := readCPUStats()
@@ -135,7 +114,7 @@ func (c *Config) captureCPUStats() {
 				c.logger.Warnf("Failed to read CPU stats, skipping iteration: %v", err)
 				continue
 			}
-			newStats := make(map[string]interface{})
+			ret := make(map[string]interface{})
 			for core, prev := range lastStats {
 				curr, ok := currStats[core]
 				if !ok {
@@ -143,10 +122,12 @@ func (c *Config) captureCPUStats() {
 					continue
 				}
 				usage := calculateUsage(prev, curr)
-				newStats[core] = usage
+				ret[core] = usage
 			}
-			c.stats = newStats
 			lastStats = currStats
+			c.readingsLock.Lock()
+			c.reading = ret
+			c.readingsLock.Unlock()
 		}
 	}
 }

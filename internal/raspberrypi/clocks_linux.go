@@ -1,19 +1,17 @@
-//go:build linux
-// +build linux
-
-package clocks
+package raspberrypi
 
 import (
 	"context"
+	"errors"
 	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/rinzlerlabs/sbcidentify"
 	"github.com/rinzlerlabs/sbcidentify/boardtype"
+	"github.com/rinzlerlabs/viam-sbc-hwmonitor/internal/sensors"
 	"go.viam.com/rdk/logging"
 )
 
@@ -47,46 +45,11 @@ var (
 type raspberryPiClockSensor struct {
 	logger     logging.Logger
 	mu         sync.RWMutex
-	wg         sync.WaitGroup
 	name       string
 	sensorType string
 	path       string
 	cancelCtx  context.Context
 	cancelFunc context.CancelFunc
-	updateTask func()
-	frequency  int64
-}
-
-func (s *raspberryPiClockSensor) StartUpdating() error {
-	updateInterval := 1 * time.Second
-	s.updateTask = func() {
-		s.wg.Add(1)
-		defer s.wg.Done()
-		for {
-			select {
-			case <-s.cancelCtx.Done():
-				return
-			case <-time.After(updateInterval):
-				var frequency int64
-				var err error
-				switch s.sensorType {
-				case "vcgencmd":
-					frequency, err = s.readVcgencmdClock()
-				case "sysfs":
-					frequency, err = s.readSysfsClock()
-				}
-				if err != nil {
-					s.logger.Errorf("failed to read clock frequency: %v", err)
-					continue
-				}
-				s.mu.Lock()
-				s.frequency = frequency
-				s.mu.Unlock()
-			}
-		}
-	}
-	go s.updateTask()
-	return nil
 }
 
 func (s *raspberryPiClockSensor) readVcgencmdClock() (int64, error) {
@@ -112,7 +75,7 @@ func (s *raspberryPiClockSensor) readVcgencmdClock() (int64, error) {
 }
 
 func (s *raspberryPiClockSensor) readSysfsClock() (int64, error) {
-	current, err := getSysFsClock(s.cancelCtx, s.path)
+	current, err := sensors.GetSysFsClock(s.cancelCtx, s.path)
 	if err != nil {
 		s.logger.Errorw("failed to read sysfs clock", "sensor", s.name, "error", err)
 		return 0, err
@@ -121,25 +84,35 @@ func (s *raspberryPiClockSensor) readSysfsClock() (int64, error) {
 	return current, nil
 }
 
-func (s *raspberryPiClockSensor) Close() {
+func (s *raspberryPiClockSensor) Close() error {
 	s.cancelFunc()
-	s.wg.Wait()
+	return nil
 }
 
-func (s *raspberryPiClockSensor) GetReadingMap() map[string]interface{} {
+func (s *raspberryPiClockSensor) GetReadingMap() (map[string]interface{}, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return map[string]interface{}{
-		s.name: s.frequency,
+	var frequency int64
+	var err error
+	switch s.sensorType {
+	case "vcgencmd":
+		frequency, err = s.readVcgencmdClock()
+	case "sysfs":
+		frequency, err = s.readSysfsClock()
+	default:
+		return nil, errors.New("unknown sensor type")
 	}
+	return map[string]interface{}{
+		s.name: frequency,
+	}, err
 }
 
 func (s *raspberryPiClockSensor) Name() string {
 	return s.name
 }
 
-func getRaspberryPi4ClockSensors(ctx context.Context, logger logging.Logger) []clockSensor {
-	sensors := make([]clockSensor, 0)
+func getRaspberryPi4ClockSensors(ctx context.Context, logger logging.Logger) []*raspberryPiClockSensor {
+	sensors := make([]*raspberryPiClockSensor, 0)
 	for _, name := range raspi4Clocks {
 		sensor := newRaspberryPiVcgencmdSensor(ctx, logger, name)
 		sensors = append(sensors, sensor)
@@ -147,8 +120,8 @@ func getRaspberryPi4ClockSensors(ctx context.Context, logger logging.Logger) []c
 	return sensors
 }
 
-func getRaspberryPi5ClockSensors(ctx context.Context, logger logging.Logger) []clockSensor {
-	sensors := make([]clockSensor, 0)
+func getRaspberryPi5ClockSensors(ctx context.Context, logger logging.Logger) []*raspberryPiClockSensor {
+	sensors := make([]*raspberryPiClockSensor, 0)
 	for _, name := range raspi5Clocks {
 		sensor := newRaspberryPiVcgencmdSensor(ctx, logger, name)
 		sensors = append(sensors, sensor)
@@ -181,23 +154,23 @@ func newRaspberryPiSysFsSensor(ctx context.Context, logger logging.Logger, path 
 	}
 }
 
-func getRaspberryPiClockSensors(ctx context.Context, logger logging.Logger) ([]clockSensor, error) {
-	sensors := make([]clockSensor, 0)
+func GetClockSensors(ctx context.Context, logger logging.Logger) ([]*raspberryPiClockSensor, error) {
+	s := make([]*raspberryPiClockSensor, 0)
 	if sbcidentify.IsBoardType(boardtype.RaspberryPi5) {
-		sensors = append(sensors, getRaspberryPi5ClockSensors(ctx, logger)...)
+		s = append(s, getRaspberryPi5ClockSensors(ctx, logger)...)
 	} else if sbcidentify.IsBoardType(boardtype.RaspberryPi4) {
-		sensors = append(sensors, getRaspberryPi4ClockSensors(ctx, logger)...)
+		s = append(s, getRaspberryPi4ClockSensors(ctx, logger)...)
 	} else {
 		b, e := sbcidentify.GetBoardType()
 		logger.Warnf("No vcgencmd clock sensors found for %s %s", b, e)
 	}
-	sysFsCpus, err := getSysFsCpuPaths()
+	sysFsCpus, err := sensors.GetSysFsCpuPaths()
 	if err != nil {
 		return nil, err
 	}
 	for _, cpu := range sysFsCpus {
 		sensor := newRaspberryPiSysFsSensor(ctx, logger, cpu)
-		sensors = append(sensors, sensor)
+		s = append(s, sensor)
 	}
-	return sensors, nil
+	return s, nil
 }

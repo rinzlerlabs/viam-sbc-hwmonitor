@@ -8,6 +8,7 @@ import (
 	"github.com/rinzlerlabs/sbcidentify/boardtype"
 	. "github.com/rinzlerlabs/sbcidentify/test"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.viam.com/rdk/logging"
 )
 
@@ -16,12 +17,15 @@ func TestJetsonPowerSensors(t *testing.T) {
 	logger := logging.NewTestLogger(t)
 	ctx := context.Background()
 	res, err := getJetsonPowerSensors(ctx, logger)
-	assert.NoError(t, err)
-	assert.NotNil(t, res)
+	require.NoError(t, err)
+	require.NotNil(t, res)
 	time.Sleep(1 * time.Second)
 	for _, s := range res {
-		assert.NotNil(t, s)
-		logger.Infof("s: %v", s.GetReadingMap())
+		require.NotNil(t, s)
+		readings, err := s.GetReadingMap()
+		require.NoError(t, err)
+		assert.NotNil(t, readings)
+		logger.Infof("s: %v", readings)
 		defer s.Close()
 	}
 }

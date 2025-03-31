@@ -8,6 +8,7 @@ import (
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
 
+	"github.com/rinzlerlabs/viam-sbc-hwmonitor/internal/sensors"
 	"github.com/rinzlerlabs/viam-sbc-hwmonitor/utils"
 )
 
@@ -21,10 +22,11 @@ var (
 
 type Config struct {
 	resource.Named
-	mu         sync.RWMutex
-	logger     logging.Logger
-	cancelCtx  context.Context
-	cancelFunc func()
+	mu              sync.RWMutex
+	logger          logging.Logger
+	cancelCtx       context.Context
+	cancelFunc      func()
+	temperatureFunc func(ctx context.Context) (*sensors.SystemTemperatures, error)
 }
 
 func init() {
@@ -60,6 +62,11 @@ func (c *Config) Reconfigure(ctx context.Context, _ resource.Dependencies, conf 
 	// In case the module has changed name
 	c.Named = conf.ResourceName().AsNamed()
 
+	temperatureFunc, err := GetTemperatureFunc()
+	if err != nil {
+		return err
+	}
+	c.temperatureFunc = temperatureFunc
 	return nil
 }
 
@@ -67,7 +74,7 @@ func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (ma
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	temperatures, err := utils.GetTemperatures(ctx)
+	temperatures, err := c.temperatureFunc(ctx)
 	if err != nil {
 		return nil, err
 	}

@@ -39,6 +39,10 @@ package: build download-license
 
 all: build
 
+test: build
+	@echo "Running tests..."
+	@go test -v ./...
+
 upload: package
 	@if [ "$(VERSION)" != "$(GIT_VERSION)" ]; then \
         echo "❌ VERSION ($(VERSION)) and GIT_VERSION ($(GIT_VERSION)) do not match."; \

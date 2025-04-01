@@ -6,6 +6,7 @@ import (
 	"time"
 
 	. "github.com/rinzlerlabs/sbcidentify/test"
+	"github.com/rinzlerlabs/viam-sbc-hwmonitor/internal/sensors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.viam.com/rdk/logging"
@@ -19,8 +20,9 @@ func TestGetProcessInfo(t *testing.T) {
 		logger: logger,
 		info:   &procInfo{Name: "sh"},
 	}
+	procMon := sensors.NewProcessMonitor(sensor.info.Name, false)
 	now := time.Now()
-	readings, err := sensor.getCPUStats(ctx)
+	readings, err := sensor.getCPUStats(ctx, procMon)
 	require.NoError(t, err)
 	elapsed := time.Since(now)
 	logger.Infof("Elapsed time: %v", elapsed)
@@ -28,6 +30,9 @@ func TestGetProcessInfo(t *testing.T) {
 	assert.NotNil(t, readings)
 	assert.NotEmpty(t, readings)
 	logger.Infof("Proc readings: %v", readings)
+
+	readings, err = sensor.getCPUStats(ctx, procMon)
+	require.NoError(t, err)
 }
 
 func TestGetProcessInfo_ProcessDoesNotExist(t *testing.T) {
@@ -38,7 +43,8 @@ func TestGetProcessInfo_ProcessDoesNotExist(t *testing.T) {
 		logger: logger,
 		info:   &procInfo{Name: "1234"},
 	}
-	readings, err := sensor.getCPUStats(ctx)
+	procMon := sensors.NewProcessMonitor(sensor.info.Name, false)
+	readings, err := sensor.getCPUStats(ctx, procMon)
 	require.NoError(t, err)
 	require.Empty(t, readings)
 }

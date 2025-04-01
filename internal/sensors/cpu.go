@@ -3,12 +3,12 @@ package sensors
 import (
 	"context"
 	"errors"
-	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"sync"
-	"syscall"
+	"slices"
+	"strconv"
+	"strings"
+	"time"
 
 	"github.com/rinzlerlabs/viam-sbc-hwmonitor/utils"
 	"github.com/shirou/gopsutil/v4/cpu"
@@ -16,7 +16,6 @@ import (
 )
 
 var (
-	symlinkCache       = sync.Map{}
 	ErrProcessNotFound = errors.New("process not found")
 )
 
@@ -33,7 +32,7 @@ type CPUCoreStats struct {
 
 type Process struct {
 	*process.Process
-	PID     int
+	PID     int32
 	Name    string // Name of the process (for convenience)
 	exe     string // Path to the executable
 	cmdline string // Command line of the process
@@ -105,6 +104,13 @@ func ReadCPUStats() (map[string]CPUCoreStats, error) {
 	return stats, nil
 }
 
+type ProcessMonitor struct {
+	Processes         utils.OrderedMap[int32, *Process] // List of processes to monitor
+	lastSync          time.Time
+	name              string
+	disablePidCachine bool
+}
+
 // CalculateUsage calculates CPU usage percentages
 func CalculateUsage(prev, curr CPUCoreStats) float64 {
 	prevIdle := prev.Idle + prev.IOWait
@@ -126,94 +132,56 @@ func CalculateUsage(prev, curr CPUCoreStats) float64 {
 	return utils.RoundValue((float64(totalDelta-idleDelta)/float64(totalDelta))*100, 2)
 }
 
-func GetProcessesWithContext(ctx context.Context, name string) (utils.OrderedMap[int, *Process], error) {
-	process.EnableBootTimeCache(true)
-	resolvedName := name
-	if !filepath.IsAbs(name) {
-		fullPath, err := exec.LookPath(name)
-		if err == nil {
-			// Recursively resolve symlinks for the resolved name
-			resolvedName, err = resolveSymlinkWithCache(fullPath)
-			if err != nil {
-				return nil, fmt.Errorf("failed to resolve symlink for %s: %w", name, err)
-			}
-		}
-	} else {
-		// Recursively resolve symlinks for the resolved name
-		resolved, err := resolveSymlinkWithCache(resolvedName)
-		if err != nil {
-			return nil, fmt.Errorf("failed to resolve symlink for %s: %w", name, err)
-		}
-		resolvedName = resolved
+func NewProcessMonitor(name string, disablePidCaching bool) *ProcessMonitor {
+	// Initialize a new process monitor
+	pm := &ProcessMonitor{
+		Processes:         utils.NewOrderedMap[int32, *Process](),
+		name:              name,
+		disablePidCachine: disablePidCaching,
+	}
+	return pm
+}
+
+func (p *ProcessMonitor) GetProcessesWithContext(ctx context.Context) (utils.OrderedMap[int32, *Process], error) {
+	if !p.disablePidCachine && p.lastSync.Add(10*time.Second).After(time.Now()) || p.Processes.Len() > 0 {
+		return p.Processes, nil // Return cached processes if within the sync interval
 	}
 
-	ret := utils.NewOrderedMap[int, *Process]()
+	for _, pid := range slices.Collect(p.Processes.Keys()) {
+		if ret, err := process.PidExistsWithContext(ctx, int32(pid)); err != nil || !ret {
+			// Remove the process from the map if it no longer exists
+			p.Processes.Delete(pid) // Keep the process in the list if it still exists
+		}
+	}
+
+	process.EnableBootTimeCache(true)
+	ret := utils.NewOrderedMap[int32, *Process]()
 	procs, err := process.ProcessesWithContext(ctx)
 	if err != nil {
 		return nil, errors.Join(errors.New("failed to get processes"), err)
 	}
 	for _, proc := range procs {
-		cmdLine, err := proc.CmdlineSliceWithContext(ctx)
+		procName, err := getProcName(proc) // Get the process name
 		if err != nil {
-			// If we can't get the command line, skip this process
 			continue
 		}
-		if len(cmdLine) > 0 && filepath.Base(cmdLine[0]) == filepath.Base(name) {
-			// If the command line matches the name, add it to the ordered map
-			ret.Set(int(proc.Pid), &Process{Process: proc, PID: int(proc.Pid), Name: name})
-			continue
-		}
-
-		exe, err := proc.Exe()
-		if err != nil {
-			// If we can't get the executable path, skip this process
-			continue
-		}
-		if exe == resolvedName || filepath.Base(exe) == filepath.Base(resolvedName) {
-			ret.Set(int(proc.Pid), &Process{Process: proc, PID: int(proc.Pid), exe: exe, Name: resolvedName}) // Store the process in the ordered map
+		if procName == p.name {
+			ret.Set(proc.Pid, &Process{Process: proc, PID: proc.Pid, Name: procName}) // Store the process in the ordered map
 			continue
 		}
 	}
+	p.Processes = ret
+	p.lastSync = time.Now() // Update the last sync time
 	return ret, nil
 }
 
-func resolveSymlinkWithCache(path string) (string, error) {
-	if cached, ok := symlinkCache.Load(path); ok {
-		return cached.(string), nil
+func getProcName(proc *process.Process) (string, error) {
+	pid := proc.Pid
+	statPath := filepath.Join("/proc", strconv.Itoa(int(pid)), "comm")
+	contents, err := os.ReadFile(statPath)
+	if err != nil {
+		return "", err
 	}
 
-	resolved, err := resolveSymlink(path)
-	if err == nil {
-		symlinkCache.Store(path, resolved)
-	}
-	return resolved, err
-}
-
-func resolveSymlink(path string) (string, error) {
-	visited := make(map[string]bool) // To detect symlink loops
-	for {
-		if visited[path] {
-			return "", fmt.Errorf("symlink loop detected for path: %s", path)
-		}
-		visited[path] = true
-
-		resolved, err := os.Readlink(path)
-		if err != nil {
-			if os.IsNotExist(err) {
-				return "", fmt.Errorf("path does not exist: %s", path)
-			}
-			// If it's not a symlink, return the path as is
-			if err.(*os.PathError).Err != syscall.EINVAL {
-				return "", err
-			}
-			return path, nil
-		}
-
-		// If the resolved path is relative, resolve it relative to the current path
-		if !filepath.IsAbs(resolved) {
-			path = filepath.Join(filepath.Dir(path), resolved)
-		} else {
-			path = resolved
-		}
-	}
+	return strings.TrimSuffix(string(contents), "\n"), nil
 }

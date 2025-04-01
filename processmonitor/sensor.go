@@ -26,13 +26,14 @@ var (
 
 type Config struct {
 	resource.Named
-	configLock      sync.Mutex
-	readingsLock    sync.RWMutex // to protect the readings map
-	logger          logging.Logger
-	info            *procInfo
-	currentReadings map[string]interface{}
-	workers         *viamutils.StoppableWorkers
-	sleepTime       time.Duration
+	configLock        sync.Mutex
+	readingsLock      sync.RWMutex // to protect the readings map
+	logger            logging.Logger
+	info              *procInfo
+	currentReadings   map[string]interface{}
+	workers           *viamutils.StoppableWorkers
+	sleepTime         time.Duration
+	disablePIDCaching bool
 }
 
 type procInfo struct {
@@ -108,6 +109,7 @@ func (c *Config) Reconfigure(ctx context.Context, _ resource.Dependencies, rawCo
 		c.logger.Warnf("Invalid sleep time %d, defaulting to 1000ms", conf.SleepTimeMs)
 		conf.SleepTimeMs = 1000 // Default to 1 second
 	}
+	c.disablePIDCaching = conf.DisablePIDCaching
 	c.sleepTime = time.Duration(conf.SleepTimeMs * int(time.Millisecond))
 	c.workers = viamutils.NewBackgroundStoppableWorkers(c.startUpdating)
 
@@ -119,20 +121,6 @@ func (c *Config) Reconfigure(ctx context.Context, _ resource.Dependencies, rawCo
 	return nil
 }
 
-// Get the process to monitor, if it hasn't already been found, or is no longer running, try to find it (again)
-func getMatchingProcesses(ctx context.Context, exePath, name string) (utils.OrderedMap[int, *sensors.Process], error) {
-	searchTerm := ""
-	if exePath != "" {
-		searchTerm = exePath
-	} else if name != "" {
-		searchTerm = name
-	} else {
-		return nil, errors.New("no process specified")
-	}
-
-	return sensors.GetProcessesWithContext(ctx, searchTerm)
-}
-
 func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
 	c.readingsLock.RLock()
 	defer c.readingsLock.RUnlock()
@@ -140,6 +128,16 @@ func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (ma
 }
 
 func (c *Config) startUpdating(ctx context.Context) {
+	var procMon *sensors.ProcessMonitor
+	if c.info.Name != "" {
+		procMon = sensors.NewProcessMonitor(c.info.Name, c.disablePIDCaching)
+	} else if c.info.ExecutablePath != "" {
+		procMon = sensors.NewProcessMonitor(c.info.ExecutablePath, c.disablePIDCaching)
+	} else {
+		// fallback to a default process monitor if no name or executable path is provided
+		c.logger.Errorf("No process monitor could be created, neither name nor executable path provided")
+		return
+	}
 	for {
 		select {
 		case <-ctx.Done():
@@ -147,7 +145,7 @@ func (c *Config) startUpdating(ctx context.Context) {
 			c.logger.Infof("Stopping %s update loop: %v", PrettyName, ctx.Err())
 			return
 		case <-time.After(c.sleepTime):
-			readings, err := c.getCPUStats(ctx)
+			readings, err := c.getCPUStats(ctx, procMon)
 			if err != nil {
 				// log the error but continue the loop
 				c.logger.Warnf("Failed to get readings: %v", err)
@@ -168,9 +166,9 @@ func (c *Config) updateCurrentReadings(newReadings map[string]interface{}) {
 	c.currentReadings = newReadings
 }
 
-func (c *Config) getCPUStats(ctx context.Context) (map[string]interface{}, error) {
+func (c *Config) getCPUStats(ctx context.Context, procMon *sensors.ProcessMonitor) (map[string]interface{}, error) {
 	resp := make(map[string]interface{})
-	procs, err := getMatchingProcesses(ctx, c.info.ExecutablePath, c.info.Name)
+	procs, err := procMon.GetProcessesWithContext(ctx)
 	if err != nil {
 		c.logger.Warnf("Error getting process: %v", err)
 		return nil, err

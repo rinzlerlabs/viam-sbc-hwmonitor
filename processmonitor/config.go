@@ -17,7 +17,8 @@ type ComponentConfig struct {
 	IncludeOpenFiles     bool   `json:"include_open_files"`
 	IncludeUlimits       bool   `json:"include_ulimits"`
 	IncludeNetStats      bool   `json:"include_net_stats"`
-	SleepTimeMs          int    `json:"sleep_time_ms"` // Sleep time in milliseconds between process checks
+	SleepTimeMs          int    `json:"sleep_time_ms"`       // Sleep time in milliseconds between process checks
+	DisablePIDCaching    bool   `json:"disable_pid_caching"` // Enable caching of PID to avoid repeated lookups
 }
 
 func (conf *ComponentConfig) Validate(path string) ([]string, error) {

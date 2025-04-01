@@ -1,6 +1,3 @@
-//go:build linux
-// +build linux
-
 package clocks
 
 import (
@@ -11,6 +8,7 @@ import (
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
 
+	"github.com/rinzlerlabs/viam-sbc-hwmonitor/internal/sensors"
 	"github.com/rinzlerlabs/viam-sbc-hwmonitor/utils"
 )
 
@@ -28,7 +26,7 @@ type Config struct {
 	logger     logging.Logger
 	cancelCtx  context.Context
 	cancelFunc func()
-	sensors    []clockSensor
+	sensors    []sensors.ClockSensor
 }
 
 func init() {
@@ -76,12 +74,6 @@ func (c *Config) Reconfigure(ctx context.Context, _ resource.Dependencies, conf 
 	}
 	c.sensors = sensors
 
-	for _, sensor := range c.sensors {
-		if err := sensor.StartUpdating(); err != nil {
-			return err
-		}
-	}
-
 	// In case the module has changed name
 	c.Named = conf.ResourceName().AsNamed()
 
@@ -93,7 +85,11 @@ func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (ma
 	defer c.mu.RUnlock()
 	readings := make(map[string]interface{})
 	for _, s := range c.sensors {
-		for k, v := range s.GetReadingMap() {
+		readings, err := s.GetReadingMap()
+		if err != nil {
+			return nil, err
+		}
+		for k, v := range readings {
 			readings[k] = v
 		}
 	}

@@ -6,10 +6,11 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestLinuxProcWifiMonitor(t *testing.T) {
-	output, err := os.ReadFile("testdata/proc.out")
+	output, err := os.ReadFile("testdata/linux_proc.txt")
 	assert.NoError(t, err)
 	tests := []struct {
 		name           string
@@ -46,14 +47,14 @@ func TestLinuxIwWifiMonitor(t *testing.T) {
 		expectedError  error
 		file           string
 	}{
-		{"AdapterExistsConnected", "wlan0", -65, 52.0, nil, "iw_wlan0_connected.out"},
-		{"AdapterExistsNotConnected", "wlan0", -1, -1, ErrNotConnected, "iw_wlan0_not_connected.out"},
-		{"AdapterDoesNotExist", "wlan1", -1, -1, ErrAdapterNotFound, "iw_wlan1_does_not_exist.out"},
+		{"AdapterExistsConnected", "wlan0", -65, 52.0, nil, "iw_wlan0_connected.txt"},
+		{"AdapterExistsNotConnected", "wlan0", -1, -1, ErrNotConnected, "iw_wlan0_not_connected.txt"},
+		{"AdapterDoesNotExist", "wlan1", -1, -1, ErrAdapterNotFound, "iw_wlan1_does_not_exist.txt"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			output, err := os.ReadFile(fmt.Sprintf("testdata/%v", tt.file))
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			w := &iwWifiMonitor{adapter: tt.adapter}
 			status, err := w.parseNetworkStatus(string(output))
 			if tt.expectedError != nil {
@@ -69,7 +70,7 @@ func TestLinuxIwWifiMonitor(t *testing.T) {
 }
 
 func TestLinuxNmcliWifiMonitor(t *testing.T) {
-	output, err := os.ReadFile("testdata/nmcli.out")
+	output, err := os.ReadFile("testdata/nmcli.txt")
 	assert.NoError(t, err)
 	tests := []struct {
 		name           string

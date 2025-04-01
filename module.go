@@ -14,7 +14,6 @@ import (
 	"github.com/rinzlerlabs/viam-sbc-hwmonitor/diskmonitor"
 	"github.com/rinzlerlabs/viam-sbc-hwmonitor/gpumonitor"
 	"github.com/rinzlerlabs/viam-sbc-hwmonitor/memorymonitor"
-	powermanager "github.com/rinzlerlabs/viam-sbc-hwmonitor/powermanager"
 	"github.com/rinzlerlabs/viam-sbc-hwmonitor/processmonitor"
 	"github.com/rinzlerlabs/viam-sbc-hwmonitor/pwmfan"
 	"github.com/rinzlerlabs/viam-sbc-hwmonitor/temperatures"
@@ -39,6 +38,6 @@ func main() {
 	moduleutils.AddModularResource(processmonitor.API, processmonitor.Model)
 	moduleutils.AddModularResource(diskmonitor.API, diskmonitor.Model)
 	moduleutils.AddModularResource(wifimonitor.API, wifimonitor.Model)
-	moduleutils.AddModularResource(powermanager.API, powermanager.Model)
+	// moduleutils.AddModularResource(powermanager.API, powermanager.Model)
 	utils.ContextualMain(moduleutils.RunModule, logger)
 }

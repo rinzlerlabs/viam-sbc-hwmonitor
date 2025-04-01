@@ -11,7 +11,7 @@ import (
 )
 
 func TestGetDiskInfo(t *testing.T) {
-	Test().ShouldSkip(t)
+	Test().RequiresSbc().ShouldSkip(t)
 	logger := logging.NewTestLogger(t)
 
 	tests := []struct {

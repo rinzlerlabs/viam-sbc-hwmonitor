@@ -1,0 +1,6 @@
+yes:HomeWiFi:HomeWiFi:11:2462:195 Mbit/s:55:wlan0
+no:CoffeeShopWiFi:CoffeeShopWiFi:1:2412:54 Mbit/s:55:wlan0
+no:NeighborWiFi:NeighborWiFi:6:2437:144 Mbit/s:48:wlan0
+no:HomeWiFi:HomeWiFi:11:2462:195 Mbit/s:55:wlan2
+no:CoffeeShopWiFi:CoffeeShopWiFi:1:2412:54 Mbit/s:55:wlan2
+no:NeighborWiFi:NeighborWiFi:6:2437:144 Mbit/s:48:wlan2

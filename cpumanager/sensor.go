@@ -14,6 +14,7 @@ import (
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
 
+	"github.com/rinzlerlabs/viam-sbc-hwmonitor/powermanager"
 	"github.com/rinzlerlabs/viam-sbc-hwmonitor/utils"
 )
 
@@ -47,7 +48,7 @@ func init() {
 func NewSensor(ctx context.Context, deps resource.Dependencies, conf resource.Config, logger logging.Logger) (sensor.Sensor, error) {
 	logger.Infof("Starting %s %s", PrettyName, Version)
 	cancelCtx, cancelFunc := context.WithCancel(context.Background())
-	logger.Error("This component is deprecated and support will be removed in a subsequent release. Please migrate to the new Power Manager component.")
+	logger.Errorf("This component is deprecated and support will be removed in a subsequent release. Please migrate to the new %v component.", powermanager.Model)
 
 	b := Config{
 		Named:      conf.ResourceName().AsNamed(),

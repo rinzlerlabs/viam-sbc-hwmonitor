@@ -5,18 +5,17 @@ import (
 
 	"github.com/rinzlerlabs/sbcidentify"
 	"github.com/rinzlerlabs/sbcidentify/boardtype"
+	"github.com/rinzlerlabs/viam-sbc-hwmonitor/internal/linux/jetson"
+	"github.com/rinzlerlabs/viam-sbc-hwmonitor/internal/linux/raspberrypi"
+	"github.com/rinzlerlabs/viam-sbc-hwmonitor/internal/sensors"
 	"go.viam.com/rdk/logging"
 )
 
-// Jetson Orin Nano Jetpack 6 voltages
-// cat /sys/bus/i2c/drivers/ina3221/1-0040/hwmon/hwmon1/in*_label
-// cat /sys/bus/i2c/drivers/ina3221/1-0040/hwmon/hwmon1/in*_input
-
-func getPowerSensors(ctx context.Context, logger logging.Logger) ([]powerSensor, error) {
+func getPowerSensors(ctx context.Context, logger logging.Logger) ([]sensors.PowerSensor, error) {
 	if sbcidentify.IsBoardType(boardtype.RaspberryPi) {
-		return getRaspberryPiPowerSensors(ctx, logger)
+		return raspberrypi.GetPowerSensors(ctx, logger)
 	} else if sbcidentify.IsBoardType(boardtype.NVIDIA) {
-		return getJetsonPowerSensors(ctx, logger)
+		return jetson.GetPowerSensors(ctx, logger)
 	}
-	return make([]powerSensor, 0), nil
+	return make([]sensors.PowerSensor, 0), nil
 }

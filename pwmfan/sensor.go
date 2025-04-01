@@ -12,6 +12,7 @@ import (
 	"go.viam.com/rdk/resource"
 	viam_utils "go.viam.com/utils"
 
+	"github.com/rinzlerlabs/viam-sbc-hwmonitor/internal/sensors"
 	"github.com/rinzlerlabs/viam-sbc-hwmonitor/utils"
 )
 
@@ -32,9 +33,8 @@ type Config struct {
 	fan              *fan
 	temperatureTable map[float64]float64
 	temps            []float64
-	monitor          func()
-	done             chan bool
-	wg               sync.WaitGroup
+	temperatureFunc  func(ctx context.Context) (*sensors.SystemTemperatures, error)
+	worker           *viam_utils.StoppableWorkers
 }
 
 func init() {
@@ -54,8 +54,6 @@ func NewSensor(ctx context.Context, deps resource.Dependencies, conf resource.Co
 		cancelCtx:  cancelCtx,
 		cancelFunc: cancelFunc,
 		mu:         sync.RWMutex{},
-		done:       make(chan bool, 1),
-		wg:         sync.WaitGroup{},
 	}
 
 	if err := b.Reconfigure(ctx, deps, conf); err != nil {
@@ -67,7 +65,10 @@ func NewSensor(ctx context.Context, deps resource.Dependencies, conf resource.Co
 func (c *Config) Reconfigure(ctx context.Context, deps resource.Dependencies, conf resource.Config) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.logger.Debugf("Reconfiguring %s", PrettyName)
+	c.logger.Infof("Reconfiguring %s", PrettyName)
+	c.logger.Debug("Stopping background worker")
+	c.worker.Stop()
+	c.logger.Debugf("Background worker stopped")
 
 	newConf, err := resource.NativeConfig[*CloudConfig](conf)
 	if err != nil {
@@ -100,53 +101,12 @@ func (c *Config) Reconfigure(ctx context.Context, deps resource.Dependencies, co
 
 	c.temps = temps
 	c.temperatureTable = tempTable
-
-	if c.monitor == nil {
-		c.monitor = func() {
-			ctx := context.Background()
-			c.wg.Add(1)
-			defer c.wg.Done()
-			for {
-				select {
-				case <-c.done:
-					return
-				default:
-					temperatures, err := utils.GetTemperatures(ctx)
-					if err != nil {
-						c.logger.Errorf("Error getting SoC temperature: %s", err)
-						break
-					}
-					if temperatures.CPU == nil {
-						c.logger.Errorf("Error getting CPU temperature")
-						break
-					}
-					currentTemp := *temperatures.CPU
-					var desiredSpeed float64
-					for _, targetTemp := range c.temps {
-						if currentTemp >= targetTemp {
-							desiredSpeed = c.temperatureTable[targetTemp]
-							break
-						}
-					}
-
-					c.logger.Debugf("Current temperature: %f, desired speed: %f", currentTemp, desiredSpeed)
-					err = c.fan.SetSpeed(ctx, desiredSpeed)
-					if err != nil {
-						c.logger.Errorf("Error setting fan speed: %s", err)
-					}
-				}
-
-				select {
-				case <-time.After(100 * time.Millisecond):
-					continue
-				case <-c.done:
-					return
-				}
-			}
-		}
-
-		viam_utils.PanicCapturingGo(c.monitor)
+	tempFunc, err := GetTemperatureFunc()
+	if err != nil {
+		return err
 	}
+	c.temperatureFunc = tempFunc
+	c.worker = viam_utils.NewBackgroundStoppableWorkers(c.startUpdating)
 
 	return nil
 }
@@ -155,7 +115,7 @@ func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (ma
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	temperatures, err := utils.GetTemperatures(ctx)
+	temperatures, err := c.temperatureFunc(ctx)
 	if err != nil {
 		c.logger.Errorf("Error getting board temperatures: %s", err)
 		return nil, err
@@ -181,9 +141,8 @@ func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (ma
 
 func (c *Config) Close(ctx context.Context) error {
 	c.logger.Infof("Shutting down %s", PrettyName)
-	c.done <- true
-	c.logger.Infof("Notifying monitor to shut down")
-	c.wg.Wait()
+	c.logger.Debugf("Notifying monitor to shut down")
+	c.worker.Stop()
 	c.logger.Info("Monitor shut down")
 	c.fan.Close()
 	return nil
@@ -191,4 +150,38 @@ func (c *Config) Close(ctx context.Context) error {
 
 func (c *Config) Ready(ctx context.Context, extra map[string]interface{}) (bool, error) {
 	return false, nil
+}
+
+func (c *Config) startUpdating(ctx context.Context) {
+	seepTime := 100 * time.Millisecond
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(seepTime):
+			temperatures, err := c.temperatureFunc(ctx)
+			if err != nil {
+				c.logger.Errorf("Error getting SoC temperature: %s", err)
+				break
+			}
+			if temperatures.CPU == nil {
+				c.logger.Errorf("Error getting CPU temperature")
+				break
+			}
+			currentTemp := *temperatures.CPU
+			var desiredSpeed float64
+			for _, targetTemp := range c.temps {
+				if currentTemp >= targetTemp {
+					desiredSpeed = c.temperatureTable[targetTemp]
+					break
+				}
+			}
+
+			c.logger.Debugf("Current temperature: %f, desired speed: %f", currentTemp, desiredSpeed)
+			err = c.fan.SetSpeed(ctx, desiredSpeed)
+			if err != nil {
+				c.logger.Errorf("Error setting fan speed: %s", err)
+			}
+		}
+	}
 }

@@ -10,6 +10,7 @@ import (
 
 	"github.com/rinzlerlabs/sbcidentify/boardtype"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.viam.com/rdk/logging"
 
 	. "github.com/rinzlerlabs/sbcidentify/test"
@@ -38,8 +39,7 @@ func TestNvidiaGetReadings(t *testing.T) {
 	Test().RequiresRoot().RequiresBoardType(boardtype.NVIDIA).ShouldSkip(t)
 	clocks, err := getClockSensors(ctx, logger)
 	for _, clock := range clocks {
-		err := clock.StartUpdating()
-		assert.NoError(t, err)
+		require.NotNil(t, clock)
 	}
 	assert.NoError(t, err)
 	sensor := &Config{

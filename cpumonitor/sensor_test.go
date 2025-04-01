@@ -7,73 +7,65 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.viam.com/rdk/logging"
+	viamutils "go.viam.com/utils"
 )
 
 func TestCaptureCPUStats(t *testing.T) {
 	logger := logging.NewTestLogger(t)
-	ctx, cancel := context.WithCancel(context.Background())
 	sensor := &Config{
-		stats:      make(map[string]interface{}),
-		cancelCtx:  ctx,
-		cancelFunc: cancel,
-		logger:     logger,
+		logger:    logger,
+		sleepTime: 1 * time.Second,
 	}
 
-	sensor.task = sensor.captureCPUStats
-	go sensor.task()
+	sensor.workers = viamutils.NewBackgroundStoppableWorkers(sensor.startUpdating)
 
 	for {
-		if len(sensor.stats) > 0 {
+		if len(sensor.reading) > 0 {
 			break
 		}
 	}
-	cancel()
-	sensor.wg.Wait()
-	assert.Equal(t, runtime.NumCPU()+1, len(sensor.stats))
+	sensor.Close(context.Background())
+	require.Equal(t, runtime.NumCPU()+1, len(sensor.reading))
+	for k, v := range sensor.reading {
+		logger.Infof("%v: %v", k, v)
+	}
 }
 
 func TestCaptureCPUStatsExitsImmediately(t *testing.T) {
 	logger := logging.NewTestLogger(t)
-	ctx, cancel := context.WithCancel(context.Background())
 	sensor := &Config{
-		stats:      make(map[string]interface{}),
-		cancelCtx:  ctx,
-		cancelFunc: cancel,
-		logger:     logger,
+		logger:    logger,
+		sleepTime: 1 * time.Second,
 	}
 
-	sensor.task = sensor.captureCPUStats
-	go sensor.task()
-	sensor.cancelFunc()
-	sensor.wg.Wait()
-	assert.Equal(t, 0, len(sensor.stats))
+	sensor.workers = viamutils.NewBackgroundStoppableWorkers(sensor.startUpdating)
+	start := time.Now()
+	sensor.Close(context.Background())
+	end := time.Now()
+	assert.Less(t, end.Sub(start), 100*time.Millisecond)
 }
 
 func TestCaptureCPUStatsRespectsSleepTime(t *testing.T) {
 	logger := logging.NewTestLogger(t)
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx := context.Background()
 	sensor := &Config{
-		stats:      make(map[string]interface{}),
-		cancelCtx:  ctx,
-		cancelFunc: cancel,
-		logger:     logger,
-		sleepTime:  100 * time.Millisecond,
+		logger:    logger,
+		sleepTime: 100 * time.Millisecond,
 	}
 
-	sensor.task = sensor.captureCPUStats
 	now := time.Now()
-	go sensor.task()
+	sensor.workers = viamutils.NewBackgroundStoppableWorkers(sensor.startUpdating)
 
 	for {
-		if len(sensor.stats) > 0 {
+		if len(sensor.reading) > 0 {
 			break
 		}
 	}
-	cancel()
-	sensor.wg.Wait()
+	sensor.Close(ctx)
 	end := time.Now()
-	assert.Equal(t, runtime.NumCPU()+1, len(sensor.stats))
+	assert.Equal(t, runtime.NumCPU()+1, len(sensor.reading))
 	testLength := end.Sub(now)
 	logger.Infof("Test took %s", testLength)
 	assert.True(t, testLength > 100*time.Millisecond)

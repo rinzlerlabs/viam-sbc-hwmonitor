@@ -130,9 +130,11 @@ func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (ma
 func (c *Config) startUpdating(ctx context.Context) {
 	var procMon *sensors.ProcessMonitor
 	if c.info.Name != "" {
-		procMon = sensors.NewProcessMonitor(c.info.Name, c.disablePIDCaching)
+		c.logger.Debugf("Creating process monitor for name: %s", c.info.Name)
+		procMon = sensors.NewProcessMonitor(c.logger, c.info.Name, c.disablePIDCaching)
 	} else if c.info.ExecutablePath != "" {
-		procMon = sensors.NewProcessMonitor(c.info.ExecutablePath, c.disablePIDCaching)
+		c.logger.Debugf("Creating process monitor for exe: %s", c.info.ExecutablePath)
+		procMon = sensors.NewProcessMonitor(c.logger, c.info.ExecutablePath, c.disablePIDCaching)
 	} else {
 		// fallback to a default process monitor if no name or executable path is provided
 		c.logger.Errorf("No process monitor could be created, neither name nor executable path provided")
@@ -173,6 +175,7 @@ func (c *Config) getCPUStats(ctx context.Context, procMon *sensors.ProcessMonito
 		c.logger.Warnf("Error getting process: %v", err)
 		return nil, err
 	}
+	c.logger.Debugf("Found %d processes for %s", procs.Len(), c.info.Name)
 
 	for _, proc := range procs.AllFromFront() {
 		ret := make(map[string]interface{})

@@ -8,11 +8,13 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/rinzlerlabs/viam-sbc-hwmonitor/utils"
 	"github.com/shirou/gopsutil/v4/cpu"
 	"github.com/shirou/gopsutil/v4/process"
+	"go.viam.com/rdk/logging"
 )
 
 var (
@@ -108,7 +110,9 @@ type ProcessMonitor struct {
 	Processes         utils.OrderedMap[int32, *Process] // List of processes to monitor
 	lastSync          time.Time
 	name              string
-	disablePidCachine bool
+	disablePidCaching bool
+	logger            logging.Logger
+	mu                sync.Mutex
 }
 
 // CalculateUsage calculates CPU usage percentages
@@ -132,20 +136,39 @@ func CalculateUsage(prev, curr CPUCoreStats) float64 {
 	return utils.RoundValue((float64(totalDelta-idleDelta)/float64(totalDelta))*100, 2)
 }
 
-func NewProcessMonitor(name string, disablePidCaching bool) *ProcessMonitor {
+func NewProcessMonitor(logger logging.Logger, name string, disablePidCaching bool) *ProcessMonitor {
 	// Initialize a new process monitor
 	pm := &ProcessMonitor{
 		Processes:         utils.NewOrderedMap[int32, *Process](),
 		name:              name,
-		disablePidCachine: disablePidCaching,
+		disablePidCaching: disablePidCaching,
+		logger:            logger,
 	}
 	return pm
 }
 
 func (p *ProcessMonitor) GetProcessesWithContext(ctx context.Context) (utils.OrderedMap[int32, *Process], error) {
-	if !p.disablePidCachine && p.lastSync.Add(10*time.Second).After(time.Now()) || p.Processes.Len() > 0 {
-		return p.Processes, nil // Return cached processes if within the sync interval
+	p.mu.Lock()
+	defer p.mu.Unlock() // Ensure the mutex is unlocked after the function completes
+	if p.Processes.Len() > 0 {
+		if !p.disablePidCaching {
+			if p.lastSync.Add(10 * time.Second).Before(time.Now()) {
+				p.logger.Debugf("Returning %d cached processes, last sync: %v, current time: %v", p.Processes.Len(), p.lastSync, time.Now())
+				return p.Processes, nil // Return cached processes if within the sync interval
+			} else {
+				// If within the sync interval and pid caching is enabled, return cached processes
+				p.logger.Debugf("Have %d cached processes, but sync interval elapsed: %v", p.Processes.Len(), p.lastSync.Add(10*time.Second))
+				return p.Processes, nil
+			}
+		} else {
+			// If pid caching is disabled, always perform a sync
+			p.logger.Debugf("Have %d cached processes, but pid caching is disabled, performing a sync", p.Processes.Len())
+		}
+	} else {
+		p.logger.Debugf("No cached processes found for %s, performing a sync", p.name)
 	}
+
+	p.logger.Debugf("Syncing processes for %s, last sync: %v, current time: %v, disablePidCaching: %v", p.name, p.lastSync, time.Now(), p.disablePidCaching)
 
 	for _, pid := range slices.Collect(p.Processes.Keys()) {
 		if ret, err := process.PidExistsWithContext(ctx, int32(pid)); err != nil || !ret {
@@ -158,20 +181,47 @@ func (p *ProcessMonitor) GetProcessesWithContext(ctx context.Context) (utils.Ord
 	ret := utils.NewOrderedMap[int32, *Process]()
 	procs, err := process.ProcessesWithContext(ctx)
 	if err != nil {
+		p.logger.Debugf("Failed to get processes: %v", err)
 		return nil, errors.Join(errors.New("failed to get processes"), err)
 	}
 	for _, proc := range procs {
-		procName, err := getProcName(proc) // Get the process name
-		if err != nil {
-			continue
-		}
-		if procName == p.name {
-			ret.Set(proc.Pid, &Process{Process: proc, PID: proc.Pid, Name: procName}) // Store the process in the ordered map
-			continue
+		// The linux kernel seems to limit the contents of /proc/<pid>/comm to 15 bytes,
+		// if the process name is longer than that we need to fall back to /proc/<pid>/cmdline
+		if len(p.name) <= 15 {
+			procName, err := getProcName(proc) // Get the process name
+			if err != nil {
+				p.logger.Debugf("Failed to get process name for PID %d: %v", proc.Pid, err)
+				continue
+			}
+			if procName == p.name {
+				p.logger.Debugf("Found process %s with PID %d", procName, proc.Pid)
+				ret.Set(proc.Pid, &Process{Process: proc, PID: proc.Pid, Name: procName}) // Store the process in the ordered map
+				continue
+			}
+		} else {
+			cmdline, err := getProcCmdline(proc)
+			if err != nil {
+				p.logger.Debugf("Failed to get process cmdline for PID %d: %v", proc.Pid, err)
+				continue
+			}
+			if cmdline == "" {
+				continue
+			}
+			if filepath.Base(cmdline) == p.name {
+				p.logger.Debugf("Found process %s with PID %d", filepath.Base(cmdline), proc.Pid)
+				ret.Set(proc.Pid, &Process{Process: proc, PID: proc.Pid, Name: filepath.Base(cmdline)}) // Store the process in the ordered map
+				continue
+			}
+			if cmdline == p.name {
+				p.logger.Debugf("Found process %s with PID %d", cmdline, proc.Pid)
+				ret.Set(proc.Pid, &Process{Process: proc, PID: proc.Pid, Name: cmdline}) // Store the process in the ordered map
+				continue
+			}
 		}
 	}
 	p.Processes = ret
 	p.lastSync = time.Now() // Update the last sync time
+	p.logger.Debugf("Synced processes for %s, found %d processes", p.name, ret.Len())
 	return ret, nil
 }
 
@@ -182,6 +232,19 @@ func getProcName(proc *process.Process) (string, error) {
 	if err != nil {
 		return "", err
 	}
-
 	return strings.TrimSuffix(string(contents), "\n"), nil
+}
+
+func getProcCmdline(proc *process.Process) (string, error) {
+	cmdlinePath := filepath.Join("/proc", strconv.Itoa(int(proc.Pid)), "cmdline")
+	data, err := os.ReadFile(cmdlinePath)
+	if err != nil {
+		return "", err
+	}
+	// The cmdline is null-separated, so split it and return the first argument
+	args := strings.Split(string(data), "\x00")
+	if len(args) > 0 {
+		return args[0], nil
+	}
+	return "", errors.New("cmdline is empty")
 }

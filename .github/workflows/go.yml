@@ -5,6 +5,8 @@ name: Go
 
 on:
   push:
+    branches:
+      - main # Trigger on pushes to the main branch
     tags:
     - 'v[0-9]+.[0-9]+.[0-9]+' # Trigger on semantic version tags, e.g., 1.2.3
     - 'v[0-9]+.[0-9]+.[0-9]+-rc[0-9]+' # Trigger on release candidate tags, e.g., v1.2.3-rc1
@@ -34,13 +36,10 @@ jobs:
       run: |
         VERSION="${GITHUB_REF_NAME#v}"
         echo "VERSION=$VERSION" >> $GITHUB_ENV
-    - name: Use formatted version
+    - name: Log Version Information
       run: |
         echo "GITHUB_REF_NAME: $GITHUB_REF_NAME"
         echo "VERSION: ${{ env.VERSION }}"
-    - name: Use formatted version
-      run: |
-        echo "Formatted version: ${{ env.VERSION }}"
     - uses: viamrobotics/build-action@v1
       with:
         # note: you can replace this line with 'version: ""' if you want to test the build process without deploying

@@ -41,11 +41,11 @@ jobs:
     - name: Use formatted version
       run: |
         echo "Formatted version: ${{ env.VERSION }}"
-    # - uses: viamrobotics/build-action@v1
-    #   with:
-    #     # note: you can replace this line with 'version: ""' if you want to test the build process without deploying
-    #     version: ${{ env.VERSION }}
-    #     # version: ""
-    #     ref: ${{ github.sha }}
-    #     key-id: ${{ secrets.viam_key_id }}
-    #     key-value: ${{ secrets.viam_key_value }}
+    - uses: viamrobotics/build-action@v1
+      with:
+        # note: you can replace this line with 'version: ""' if you want to test the build process without deploying
+        version: ${{ env.VERSION }}
+        # version: ""
+        ref: ${{ github.sha }}
+        key-id: ${{ secrets.viam_key_id }}
+        key-value: ${{ secrets.viam_key_value }}

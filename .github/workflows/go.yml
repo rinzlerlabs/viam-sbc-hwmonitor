@@ -8,7 +8,7 @@ on:
     branches:
       - main
     tags:
-    - '[0-9]+.[0-9]+.[0-9]+(-rc[0-9]+)?' # Trigger on semantic version tags, e.g., 1.2.3 or 1.2.3-rc1
+    - 'v[0-9]+.[0-9]+.[0-9]+(-rc[0-9]+)?' # Trigger on semantic version tags, e.g., 1.2.3 or 1.2.3-rc1
   workflow_dispatch:
 
 jobs:
@@ -30,11 +30,23 @@ jobs:
     if: github.ref_type == 'tag' # Only run this job for tags
     steps:
     - uses: actions/checkout@v3
-    - uses: viamrobotics/build-action@v1
-      with:
-        # note: you can replace this line with 'version: ""' if you want to test the build process without deploying
-        version: ${{ github.ref_name }}
-        # version: ""
-        ref: ${{ github.sha }}
-        key-id: ${{ secrets.viam_key_id }}
-        key-value: ${{ secrets.viam_key_value }}
+    - name: Format Version from github.ref_name
+      id: format_version
+      run: |
+        VERSION="${GITHUB_REF_NAME#v}"
+        echo "VERSION=$VERSION" >> $GITHUB_ENV
+    - name: Use formatted version
+      run: |
+        echo "GITHUB_REF_NAME: $GITHUB_REF_NAME"
+        echo "VERSION: ${{ env.VERSION }}"
+    - name: Use formatted version
+      run: |
+        echo "Formatted version: ${{ env.VERSION }}"
+    # - uses: viamrobotics/build-action@v1
+    #   with:
+    #     # note: you can replace this line with 'version: ""' if you want to test the build process without deploying
+    #     version: ${{ env.VERSION }}
+    #     # version: ""
+    #     ref: ${{ github.sha }}
+    #     key-id: ${{ secrets.viam_key_id }}
+    #     key-value: ${{ secrets.viam_key_value }}

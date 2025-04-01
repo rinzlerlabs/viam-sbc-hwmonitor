@@ -6,11 +6,12 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"time"
 
 	"go.viam.com/rdk/components/sensor"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
-	goutils "go.viam.com/utils"
+	viamutils "go.viam.com/utils"
 
 	"github.com/rinzlerlabs/viam-sbc-hwmonitor/utils"
 )
@@ -25,13 +26,14 @@ var (
 
 type Config struct {
 	resource.Named
-	mu         sync.Mutex
-	logger     logging.Logger
-	cancelCtx  context.Context
-	cancelFunc func()
-	info       *procInfo
-	processes  utils.OrderedMap[int, *process]
-	workers    *goutils.StoppableWorkers
+	configLock   sync.Mutex
+	readingsLock sync.RWMutex // to protect the readings map
+	logger       logging.Logger
+	info         *procInfo
+	processes    utils.OrderedMap[int, *process]
+	reading      map[string]interface{}
+	workers      *viamutils.StoppableWorkers
+	sleepTime    time.Duration
 }
 
 type procInfo struct {
@@ -56,14 +58,11 @@ func init() {
 
 func NewSensor(ctx context.Context, deps resource.Dependencies, conf resource.Config, logger logging.Logger) (sensor.Sensor, error) {
 	logger.Infof("Starting %s %s", PrettyName, Version)
-	cancelCtx, cancelFunc := context.WithCancel(context.Background())
 
 	b := Config{
 		Named:      conf.ResourceName().AsNamed(),
 		logger:     logger,
-		cancelCtx:  cancelCtx,
-		cancelFunc: cancelFunc,
-		mu:         sync.Mutex{},
+		configLock: sync.Mutex{},
 	}
 
 	if err := b.Reconfigure(ctx, deps, conf); err != nil {
@@ -72,35 +71,42 @@ func NewSensor(ctx context.Context, deps resource.Dependencies, conf resource.Co
 	return &b, nil
 }
 
-func (c *Config) Reconfigure(ctx context.Context, _ resource.Dependencies, conf resource.Config) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+func (c *Config) Reconfigure(ctx context.Context, _ resource.Dependencies, rawConf resource.Config) error {
+	c.configLock.Lock()
+	defer c.configLock.Unlock()
 	c.logger.Debugf("Reconfiguring %s", PrettyName)
 
-	newConf, err := resource.NativeConfig[*ComponentConfig](conf)
+	conf, err := resource.NativeConfig[*ComponentConfig](rawConf)
 	if err != nil {
 		return err
 	}
 
-	if newConf.Name == "" && newConf.ExecutablePath == "" {
+	if conf.Name == "" && conf.ExecutablePath == "" {
 		return errors.New("either name or executable path must be set")
 	}
 
 	c.info = &procInfo{
-		Name:                 newConf.Name,
-		ExecutablePath:       newConf.ExecutablePath,
-		IncludeEnv:           newConf.IncludeEnv,
-		IncludeCmdline:       newConf.IncludeCmdline,
-		IncludeCwd:           newConf.IncludeCwd,
-		IncludeOpenFileCount: newConf.IncludeOpenFileCount,
-		IncludeMemInfo:       newConf.IncludeMemInfo,
-		IncludeUlimits:       newConf.IncludeUlimits,
-		IncludeOpenFiles:     newConf.IncludeOpenFiles,
-		IncludeNetStats:      newConf.IncludeNetStats,
+		Name:                 conf.Name,
+		ExecutablePath:       conf.ExecutablePath,
+		IncludeEnv:           conf.IncludeEnv,
+		IncludeCmdline:       conf.IncludeCmdline,
+		IncludeCwd:           conf.IncludeCwd,
+		IncludeOpenFileCount: conf.IncludeOpenFileCount,
+		IncludeMemInfo:       conf.IncludeMemInfo,
+		IncludeUlimits:       conf.IncludeUlimits,
+		IncludeOpenFiles:     conf.IncludeOpenFiles,
+		IncludeNetStats:      conf.IncludeNetStats,
 	}
 
 	// In case the module has changed name
-	c.Named = conf.ResourceName().AsNamed()
+	c.Named = rawConf.ResourceName().AsNamed()
+	if conf.SleepTimeMs <= 0 {
+		// Default to 1000ms if no sleep time is provided
+		c.logger.Warnf("Invalid sleep time %d, defaulting to 1000ms", conf.SleepTimeMs)
+		conf.SleepTimeMs = 1000 // Default to 1 second
+	}
+	c.sleepTime = time.Duration(conf.SleepTimeMs * int(time.Millisecond))
+	c.workers = viamutils.NewBackgroundStoppableWorkers(c.startUpdating)
 
 	return nil
 }
@@ -147,9 +153,33 @@ func (c *Config) updateProcessList() error {
 }
 
 func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.readingsLock.RLock()
+	defer c.readingsLock.RUnlock()
 	return c.getReadings(ctx)
+}
+
+func (c *Config) startUpdating(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			// exit the loop if the context is done
+			c.logger.Infof("Stopping %s update loop: %v", PrettyName, ctx.Err())
+			return
+		case <-time.After(c.sleepTime):
+			readings, err := c.getReadings(ctx)
+			if err != nil {
+				// log the error but continue the loop
+				c.logger.Warnf("Failed to get readings for %s: %v", PrettyName, err)
+				continue
+			}
+			// Update the readings in the sensor
+			c.readingsLock.Lock()
+			c.reading = readings
+			c.readingsLock.Unlock()
+			// log the successful update
+			c.logger.Debugf("Successfully updated readings for %s: %v", PrettyName, readings)
+		}
+	}
 }
 
 func (c *Config) getReadings(ctx context.Context) (map[string]interface{}, error) {
@@ -259,8 +289,8 @@ func (c *Config) getReadings(ctx context.Context) (map[string]interface{}, error
 
 func (c *Config) Close(ctx context.Context) error {
 	c.logger.Infof("Shutting down %s", PrettyName)
-	c.cancelFunc()
 	c.workers.Stop()
+	c.logger.Infof("%s Shutdown complete", PrettyName)
 	return nil
 }
 

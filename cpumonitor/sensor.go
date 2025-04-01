@@ -71,6 +71,11 @@ func (c *Config) Reconfigure(ctx context.Context, _ resource.Dependencies, rawCo
 
 	// In case the component has changed name
 	c.Named = rawConf.ResourceName().AsNamed()
+	if conf.SleepTimeMs <= 0 {
+		// Default to 1000ms if no sleep time is provided
+		c.logger.Warnf("Invalid sleep time %d, defaulting to 1000ms", conf.SleepTimeMs)
+		conf.SleepTimeMs = 1000 // Default to 1 second
+	}
 	c.sleepTime = time.Duration(conf.SleepTimeMs * int(time.Millisecond))
 	c.workers = viamutils.NewBackgroundStoppableWorkers(c.startUpdating)
 

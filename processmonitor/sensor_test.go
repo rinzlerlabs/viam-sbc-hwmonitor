@@ -39,6 +39,6 @@ func TestGetProcessInfo_ProcessDoesNotExist(t *testing.T) {
 		info:   &procInfo{Name: "1234"},
 	}
 	readings, err := sensor.getCPUStats(ctx)
-	require.Error(t, err)
-	require.Nil(t, readings)
+	require.NoError(t, err)
+	require.Empty(t, readings)
 }

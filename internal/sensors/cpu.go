@@ -132,19 +132,19 @@ func GetProcessesWithContext(ctx context.Context, name string) (utils.OrderedMap
 	if !filepath.IsAbs(name) {
 		fullPath, err := exec.LookPath(name)
 		if err == nil {
-			resolvedName = fullPath
+			// Recursively resolve symlinks for the resolved name
+			resolvedName, err = resolveSymlinkWithCache(fullPath)
+			if err != nil {
+				return nil, fmt.Errorf("failed to resolve symlink for %s: %w", name, err)
+			}
 		}
 	} else {
-		// If it's an absolute path, resolve symlinks
-		if resolved, err := os.Readlink(name); err == nil {
-			resolvedName = resolved
+		// Recursively resolve symlinks for the resolved name
+		resolved, err := resolveSymlinkWithCache(resolvedName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve symlink for %s: %w", name, err)
 		}
-	}
-
-	// Recursively resolve symlinks for the resolved name
-	resolvedName, err := resolveSymlinkWithCache(resolvedName)
-	if err != nil {
-		return nil, fmt.Errorf("failed to resolve symlink for %s: %w", name, err)
+		resolvedName = resolved
 	}
 
 	ret := utils.NewOrderedMap[int, *Process]()

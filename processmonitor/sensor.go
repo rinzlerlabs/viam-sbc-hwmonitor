@@ -26,14 +26,14 @@ var (
 
 type Config struct {
 	resource.Named
-	configLock   sync.Mutex
-	readingsLock sync.RWMutex // to protect the readings map
-	logger       logging.Logger
-	info         *procInfo
-	processes    utils.OrderedMap[int, *process]
-	reading      map[string]interface{}
-	workers      *viamutils.StoppableWorkers
-	sleepTime    time.Duration
+	configLock      sync.Mutex
+	readingsLock    sync.RWMutex // to protect the readings map
+	logger          logging.Logger
+	info            *procInfo
+	processes       utils.OrderedMap[int, *process]
+	currentReadings map[string]interface{}
+	workers         *viamutils.StoppableWorkers
+	sleepTime       time.Duration
 }
 
 type procInfo struct {
@@ -155,7 +155,7 @@ func (c *Config) updateProcessList() error {
 func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
 	c.readingsLock.RLock()
 	defer c.readingsLock.RUnlock()
-	return c.getReadings(ctx)
+	return c.currentReadings, nil
 }
 
 func (c *Config) startUpdating(ctx context.Context) {
@@ -166,7 +166,7 @@ func (c *Config) startUpdating(ctx context.Context) {
 			c.logger.Infof("Stopping %s update loop: %v", PrettyName, ctx.Err())
 			return
 		case <-time.After(c.sleepTime):
-			readings, err := c.getReadings(ctx)
+			readings, err := c.getCPUStats(ctx)
 			if err != nil {
 				// log the error but continue the loop
 				c.logger.Warnf("Failed to get readings for %s: %v", PrettyName, err)
@@ -174,7 +174,7 @@ func (c *Config) startUpdating(ctx context.Context) {
 			}
 			// Update the readings in the sensor
 			c.readingsLock.Lock()
-			c.reading = readings
+			c.currentReadings = readings
 			c.readingsLock.Unlock()
 			// log the successful update
 			c.logger.Debugf("Successfully updated readings for %s: %v", PrettyName, readings)
@@ -182,7 +182,7 @@ func (c *Config) startUpdating(ctx context.Context) {
 	}
 }
 
-func (c *Config) getReadings(ctx context.Context) (map[string]interface{}, error) {
+func (c *Config) getCPUStats(ctx context.Context) (map[string]interface{}, error) {
 	resp := make(map[string]interface{})
 	err := c.updateProcessList()
 	if err != nil {

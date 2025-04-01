@@ -20,7 +20,7 @@ func TestGetProcessInfo(t *testing.T) {
 		info:   &procInfo{Name: "sh"},
 	}
 	now := time.Now()
-	readings, err := sensor.Readings(ctx, nil)
+	readings, err := sensor.getCPUStats(ctx)
 	require.NoError(t, err)
 	elapsed := time.Since(now)
 	logger.Infof("Elapsed time: %v", elapsed)
@@ -38,7 +38,7 @@ func TestGetProcessInfo_ProcessDoesNotExist(t *testing.T) {
 		logger: logger,
 		info:   &procInfo{Name: "1234"},
 	}
-	readings, err := sensor.Readings(ctx, nil)
+	readings, err := sensor.getCPUStats(ctx)
 	require.Error(t, err)
 	require.Nil(t, readings)
 }

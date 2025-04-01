@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"sync"
 	"time"
 
@@ -13,6 +12,7 @@ import (
 	"go.viam.com/rdk/resource"
 	viamutils "go.viam.com/utils"
 
+	"github.com/rinzlerlabs/viam-sbc-hwmonitor/internal/sensors"
 	"github.com/rinzlerlabs/viam-sbc-hwmonitor/utils"
 )
 
@@ -30,7 +30,6 @@ type Config struct {
 	readingsLock    sync.RWMutex // to protect the readings map
 	logger          logging.Logger
 	info            *procInfo
-	processes       utils.OrderedMap[int, *process]
 	currentReadings map[string]interface{}
 	workers         *viamutils.StoppableWorkers
 	sleepTime       time.Duration
@@ -60,9 +59,8 @@ func NewSensor(ctx context.Context, deps resource.Dependencies, conf resource.Co
 	logger.Infof("Starting %s %s", PrettyName, Version)
 
 	b := Config{
-		Named:      conf.ResourceName().AsNamed(),
-		logger:     logger,
-		configLock: sync.Mutex{},
+		Named:  conf.ResourceName().AsNamed(),
+		logger: logger,
 	}
 
 	if err := b.Reconfigure(ctx, deps, conf); err != nil {
@@ -75,6 +73,11 @@ func (c *Config) Reconfigure(ctx context.Context, _ resource.Dependencies, rawCo
 	c.configLock.Lock()
 	defer c.configLock.Unlock()
 	c.logger.Debugf("Reconfiguring %s", PrettyName)
+	if c.workers != nil {
+		c.logger.Debug("Stopping background worker")
+		c.workers.Stop()
+		c.logger.Debugf("Background worker stopped")
+	}
 
 	conf, err := resource.NativeConfig[*ComponentConfig](rawConf)
 	if err != nil {
@@ -108,48 +111,26 @@ func (c *Config) Reconfigure(ctx context.Context, _ resource.Dependencies, rawCo
 	c.sleepTime = time.Duration(conf.SleepTimeMs * int(time.Millisecond))
 	c.workers = viamutils.NewBackgroundStoppableWorkers(c.startUpdating)
 
-	return nil
-}
-
-// check if the PID exists in /proc, if it doesn't, the process is no longer running
-func procExists(proc *process) bool {
-	if _, err := os.Stat(fmt.Sprintf("/proc/%d", proc.Pid)); os.IsNotExist(err) {
-		return false
+	if c.currentReadings == nil {
+		// Initialize the current readings map if it is nil, this shouldn't happen but just in case
+		c.currentReadings = make(map[string]interface{})
 	}
-	return true
+
+	return nil
 }
 
 // Get the process to monitor, if it hasn't already been found, or is no longer running, try to find it (again)
-func (c *Config) updateProcessList() error {
-	procs := utils.NewOrderedMap[int, *process]()
-	if c.processes != nil {
-		for pid, proc := range c.processes.AllFromFront() {
-			if procExists(proc) {
-				procs.Set(pid, proc)
-			}
-		}
+func getMatchingProcesses(ctx context.Context, exePath, name string) (utils.OrderedMap[int, *sensors.Process], error) {
+	searchTerm := ""
+	if exePath != "" {
+		searchTerm = exePath
+	} else if name != "" {
+		searchTerm = name
+	} else {
+		return nil, errors.New("no process specified")
 	}
 
-	var newProcs utils.OrderedMap[int, *process]
-	var err error
-	if c.info.ExecutablePath != "" {
-		newProcs, err = getProcessesByExe(c.info.ExecutablePath)
-	} else if c.info.Name != "" {
-		newProcs, err = getProcessesByName(c.info.Name)
-	} else {
-		return errors.New("no process specified")
-	}
-	if err != nil {
-		return err
-	}
-	for newProcPid, newProc := range newProcs.AllFromFront() {
-		if procs.Has(newProcPid) {
-			continue
-		}
-		procs.Set(newProcPid, newProc)
-	}
-	c.processes = procs
-	return nil
+	return sensors.GetProcessesWithContext(ctx, searchTerm)
 }
 
 func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
@@ -169,81 +150,101 @@ func (c *Config) startUpdating(ctx context.Context) {
 			readings, err := c.getCPUStats(ctx)
 			if err != nil {
 				// log the error but continue the loop
-				c.logger.Warnf("Failed to get readings for %s: %v", PrettyName, err)
+				c.logger.Warnf("Failed to get readings: %v", err)
+				c.updateCurrentReadings(make(map[string]interface{}))
 				continue
 			}
 			// Update the readings in the sensor
-			c.readingsLock.Lock()
-			c.currentReadings = readings
-			c.readingsLock.Unlock()
+			c.updateCurrentReadings(readings)
 			// log the successful update
 			c.logger.Debugf("Successfully updated readings for %s: %v", PrettyName, readings)
 		}
 	}
 }
 
+func (c *Config) updateCurrentReadings(newReadings map[string]interface{}) {
+	c.readingsLock.Lock()
+	defer c.readingsLock.Unlock()
+	c.currentReadings = newReadings
+}
+
 func (c *Config) getCPUStats(ctx context.Context) (map[string]interface{}, error) {
 	resp := make(map[string]interface{})
-	err := c.updateProcessList()
+	procs, err := getMatchingProcesses(ctx, c.info.ExecutablePath, c.info.Name)
 	if err != nil {
 		c.logger.Warnf("Error getting process: %v", err)
 		return nil, err
 	}
 
-	for _, proc := range c.processes.AllFromFront() {
-		if err := proc.UpdateStats(ctx); err != nil {
-			c.logger.Warnf("Error updating process stats: %v", err)
-		} else {
-			ret := make(map[string]interface{})
-			if c.info.Name != "" {
-				ret["name"] = proc.Name
-			}
-			if c.info.ExecutablePath != "" {
-				ret["exe"] = proc.Exe
-			}
-
-			ret["pid"] = proc.Pid
-			ret["cpu"] = proc.CPUPercent()
-			ret["cpu_since_boot"] = proc.CPUPercentSinceBoot()
-			ret["threads"] = proc.NumThreads()
-
-			if c.info.IncludeCwd {
-				ret["cwd"] = proc.Cwd
-			}
-			if c.info.IncludeCmdline {
-				ret["cmdline"] = proc.CmdLine
-			}
-			if c.info.IncludeOpenFileCount {
-				fc, err := proc.GetOpenFileCount()
-				if err != nil {
-					c.logger.Warnf("Error getting process open file count: %v", err)
-				} else {
-					ret["open_files"] = fc
-				}
-			}
-			if c.info.IncludeEnv {
-				env, err := proc.GetEnv()
-				if err != nil {
-					c.logger.Warnf("Error getting process environment: %v", err)
-				} else {
-					ret["env"] = env
-				}
-			}
-			if c.info.IncludeMemInfo {
-				mem, err := proc.GetMemoryInfo()
-				if err != nil {
-					c.logger.Warnf("Error getting process memory: %v", err)
-				} else {
-					ret["mem_rss"] = mem.VmRSS
-					ret["mem_hwm"] = mem.VmHWM
-					ret["mem_data"] = mem.VmData
-					ret["mem_stack"] = mem.VmStack
-					ret["mem_swap"] = mem.VmSwap
-					ret["mem_size"] = mem.VmSize
-				}
-			}
-			resp[fmt.Sprintf("%d", proc.Pid)] = ret
+	for _, proc := range procs.AllFromFront() {
+		ret := make(map[string]interface{})
+		if c.info.Name != "" {
+			ret["name"] = proc.Name
 		}
+		if c.info.ExecutablePath != "" {
+			exe, err := proc.Exe()
+			if err != nil {
+				c.logger.Warnf("Error getting executable path for process %d: %v", proc.PID, err)
+			} else {
+				ret["exe"] = exe
+			}
+		}
+
+		ret["pid"] = proc.PID
+		if cpu, err := proc.CPUPercentWithContext(ctx); err == nil {
+			ret["cpu"] = cpu
+		} else {
+			c.logger.Debugf("Failed to get CPU percent for process %d: %v", proc.PID, err)
+		}
+
+		// ret["cpu_since_boot"] = proc.CPUPercentSinceBoot()
+		if numThreads, err := proc.NumThreadsWithContext(ctx); err == nil {
+			ret["threads"] = numThreads
+		} else {
+			c.logger.Debugf("Failed to get number of threads for process %d: %v", proc.PID, err)
+		}
+
+		if c.info.IncludeCwd {
+			if cwd, err := proc.CwdWithContext(ctx); err == nil {
+				ret["cwd"] = cwd
+			} else {
+				c.logger.Debugf("Failed to get current working directory for process %d: %v", proc.PID, err)
+			}
+		}
+		if c.info.IncludeCmdline {
+			if cmdline, err := proc.CmdlineWithContext(ctx); err == nil {
+				ret["cmdline"] = cmdline
+			} else {
+				c.logger.Debugf("Failed to get command line for process %d: %v", proc.PID, err)
+			}
+		}
+		if c.info.IncludeOpenFileCount {
+			if openFiles, err := proc.OpenFilesWithContext(ctx); err == nil {
+				ret["open_files"] = len(openFiles)
+			} else {
+				c.logger.Debugf("Failed to get open files for process %d: %v", proc.PID, err)
+			}
+		}
+		if c.info.IncludeEnv {
+			if env, err := proc.EnvironWithContext(ctx); err == nil {
+				ret["env"] = env
+			} else {
+				c.logger.Debugf("Failed to get environment variables for process %d: %v", proc.PID, err)
+			}
+		}
+		if c.info.IncludeMemInfo {
+			if mem, err := proc.MemoryInfoWithContext(ctx); err == nil {
+				ret["mem_rss"] = mem.RSS
+				ret["mem_hwm"] = mem.HWM
+				ret["mem_data"] = mem.Data
+				ret["mem_stack"] = mem.Stack
+				ret["mem_swap"] = mem.Swap
+				ret["mem_size"] = mem.VMS
+			} else {
+				c.logger.Debugf("Failed to get memory info for process %d: %v", proc.PID, err)
+			}
+		}
+		resp[fmt.Sprintf("%d", proc.Pid)] = ret
 	}
 	return resp, nil
 }

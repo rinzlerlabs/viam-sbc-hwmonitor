@@ -60,9 +60,12 @@ func (c *Config) Reconfigure(ctx context.Context, _ resource.Dependencies, rawCo
 	c.configLock.Lock()
 	defer c.configLock.Unlock()
 	c.logger.Infof("Reconfiguring %s", PrettyName)
-	c.logger.Debug("Stopping background worker")
-	c.workers.Stop()
-	c.logger.Debugf("Background worker stopped")
+
+	if c.workers != nil {
+		c.logger.Debug("Stopping background worker")
+		c.workers.Stop()
+		c.logger.Debugf("Background worker stopped")
+	}
 
 	conf, err := resource.NativeConfig[*ComponentConfig](rawConf)
 	if err != nil {

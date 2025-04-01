@@ -22,9 +22,15 @@ import (
 	"github.com/rinzlerlabs/viam-sbc-hwmonitor/utils"
 	"github.com/rinzlerlabs/viam-sbc-hwmonitor/voltages"
 	"github.com/rinzlerlabs/viam-sbc-hwmonitor/wifimonitor"
+
+	"net/http"
+	_ "net/http/pprof" // for profiling support, can be used to debug performance issues
 )
 
 func main() {
+	go func() {
+		http.ListenAndServe(":6060", nil) // pprof server for profiling
+	}()
 	logger := module.NewLoggerFromArgs(utils.LoggerName)
 	logger.Infof("Starting RinzlerLabs SBC Sensors Module %v", utils.Version)
 	moduleutils.AddModularResource(clocks.API, clocks.Model)

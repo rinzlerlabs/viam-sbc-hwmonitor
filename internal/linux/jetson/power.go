@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -60,27 +61,35 @@ func (s *jetsonPowerSensor) GetReading() (voltage, current, power float64, err e
 }
 
 func (s *jetsonPowerSensor) GetReadingMap() (map[string]interface{}, error) {
+	ret := make(map[string]interface{})
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	current, voltage, power, err := s.GetReading()
 	if err != nil {
 		return nil, err
 	}
+	ret["voltage"] = voltage
+	ret["current"] = current
+	ret["power"] = power
+
 	overCurrentAlarm, err := utils.ReadBoolFromFileWithContext(s.cancelCtx, s.overCurrentAlarmFile)
 	if err != nil {
-		return nil, err
+		if !os.IsNotExist(err) {
+			return nil, err
+		}
+	} else {
+		ret["over_current_alarm"] = overCurrentAlarm // ensure we set this in the map if it was read successfully
 	}
 	criticalOverCurrentAlarm, err := utils.ReadBoolFromFileWithContext(s.cancelCtx, s.criticalOverCurrentAlarmFile)
 	if err != nil {
-		return nil, err
+		if !os.IsNotExist(err) {
+			return nil, err
+		}
+	} else {
+		// ensure we set this in the map if it was read successfully
+		ret["critical_over_current"] = criticalOverCurrentAlarm
 	}
-	return map[string]interface{}{
-		"voltage":               voltage,
-		"current":               current,
-		"power":                 power,
-		"over_current_alarm":    overCurrentAlarm,
-		"critical_over_current": criticalOverCurrentAlarm,
-	}, nil
+	return ret, nil
 }
 
 func newJetsonPowerSensor(ctx context.Context, logger logging.Logger, index int) (*jetsonPowerSensor, error) {

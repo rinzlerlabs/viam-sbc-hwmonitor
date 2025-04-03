@@ -7,9 +7,10 @@ import (
 	"os"
 	"regexp"
 
+	"go.viam.com/rdk/logging"
+
 	"github.com/rinzlerlabs/viam-sbc-hwmonitor/internal/sensors"
 	"github.com/rinzlerlabs/viam-sbc-hwmonitor/utils"
-	"go.viam.com/rdk/logging"
 )
 
 var (
@@ -17,7 +18,7 @@ var (
 	ErrStatsNotAvailable  = errors.New("stats not available for this device")
 
 	jetpack5Sensors = []jetsonGpuSensor{
-		{sensorType: sensors.GPUReadingTypeMemoryFree, currentValuePath: "/sys/kernel/debug/nvmap/iovmm/free_size"},
+		{sensorType: sensors.GPUReadingTypeMemoryFree, currentValuePath: "/sys/kernel/debug/nvmap/iovmm/free_size", regex: regexp.MustCompile(`(?m)^\s*([0-9]+)\s+bytes\s*$`)},
 		{sensorType: sensors.GPUReadingTypeMemoryUsed, currentValuePath: "/sys/kernel/debug/nvmap/stats/total_memory"},
 		{sensorType: sensors.GPUReadingTypeUtilizationGPU, currentValuePath: "/sys/devices/platform/gpu.0/load", multiplier: 0.1},
 		{sensorType: sensors.GPUReadingTypeClocksGraphics, currentValuePath: "/sys/class/devfreq/17000000.ga10b/cur_freq"},

@@ -18,7 +18,7 @@ var (
 	ErrStatsNotAvailable  = errors.New("stats not available for this device")
 
 	jetpack5Sensors = []jetsonGpuSensor{
-		{sensorType: sensors.GPUReadingTypeMemoryFree, currentValuePath: "/sys/kernel/debug/nvmap/iovmm/free_size", regex: regexp.MustCompile(`(?m)^\s*([0-9]+)\s+bytes\s*$`)},
+		{sensorType: sensors.GPUReadingTypeMemoryFree, currentValuePath: "/sys/kernel/debug/nvmap/iovmm/free_size", regex: regexp.MustCompile(`([0-9]+)\s+bytes\s*$`)},
 		{sensorType: sensors.GPUReadingTypeMemoryUsed, currentValuePath: "/sys/kernel/debug/nvmap/stats/total_memory"},
 		{sensorType: sensors.GPUReadingTypeUtilizationGPU, currentValuePath: "/sys/devices/platform/gpu.0/load", multiplier: 0.1},
 		{sensorType: sensors.GPUReadingTypeClocksGraphics, currentValuePath: "/sys/class/devfreq/17000000.ga10b/cur_freq"},
@@ -27,7 +27,7 @@ var (
 		{sensorType: sensors.GPUReadingTypeClocksVideoImageCompositor, currentValuePath: "/sys/class/devfreq/15340000.vic/cur_freq"},
 	}
 	jetpack6Sensors = []jetsonGpuSensor{
-		{sensorType: sensors.GPUReadingTypeMemoryFree, currentValuePath: "/sys/kernel/debug/nvmap/iovmm/free_size", regex: regexp.MustCompile(`(?m)^\s*([0-9]+)\s+bytes\s*$`)},
+		{sensorType: sensors.GPUReadingTypeMemoryFree, currentValuePath: "/sys/kernel/debug/nvmap/iovmm/free_size", regex: regexp.MustCompile(`([0-9]+)\s+bytes\s*$`)},
 		{sensorType: sensors.GPUReadingTypeMemoryUsed, currentValuePath: "/sys/kernel/debug/nvmap/stats/total_memory"},
 		{sensorType: sensors.GPUReadingTypeUtilizationGPU, currentValuePath: "/sys/devices/platform/bus@0/gpu.0/load", multiplier: 0.1},
 		{sensorType: sensors.GPUReadingTypeClocksGraphics, currentValuePath: "/sys/class/devfreq/17000000.gpu/cur_freq"},

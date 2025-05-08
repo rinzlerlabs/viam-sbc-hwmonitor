@@ -18,18 +18,15 @@ var (
 	ErrStatsNotAvailable  = errors.New("stats not available for this device")
 
 	jetpack5Sensors = []jetsonGpuSensor{
-		{sensorType: sensors.GPUReadingTypeMemoryFree, currentValuePath: "/sys/kernel/debug/nvmap/iovmm/free_size", regex: regexp.MustCompile(`([0-9]+)\s+bytes\s*$`)},
-		{sensorType: sensors.GPUReadingTypeMemoryUsed, currentValuePath: "/sys/kernel/debug/nvmap/stats/total_memory"},
-		{sensorType: sensors.GPUReadingTypeUtilizationGPU, currentValuePath: "/sys/devices/platform/gpu.0/load", multiplier: 0.1},
 		{sensorType: sensors.GPUReadingTypeClocksGraphics, currentValuePath: "/sys/class/devfreq/17000000.ga10b/cur_freq"},
 		{sensorType: sensors.GPUReadingTypeClocksVideo, currentValuePath: "/sys/class/devfreq/15480000.nvdec/cur_freq"},
 		{sensorType: sensors.GPUReadingTypeClocksMemory, currentValuePath: "/sys/kernel/debug/clk/emc/clk_rate"},
 		{sensorType: sensors.GPUReadingTypeClocksVideoImageCompositor, currentValuePath: "/sys/class/devfreq/15340000.vic/cur_freq"},
-	}
-	jetpack6Sensors = []jetsonGpuSensor{
+		{sensorType: sensors.GPUReadingTypeUtilizationGPU, currentValuePath: "/sys/devices/platform/gpu.0/load", multiplier: 0.1},
 		{sensorType: sensors.GPUReadingTypeMemoryFree, currentValuePath: "/sys/kernel/debug/nvmap/iovmm/free_size", regex: regexp.MustCompile(`([0-9]+)\s+bytes\s*$`)},
 		{sensorType: sensors.GPUReadingTypeMemoryUsed, currentValuePath: "/sys/kernel/debug/nvmap/stats/total_memory"},
-		{sensorType: sensors.GPUReadingTypeUtilizationGPU, currentValuePath: "/sys/devices/platform/bus@0/gpu.0/load", multiplier: 0.1},
+	}
+	jetpack6Sensors = []jetsonGpuSensor{
 		{sensorType: sensors.GPUReadingTypeClocksGraphics, currentValuePath: "/sys/class/devfreq/17000000.gpu/cur_freq"},
 		{sensorType: sensors.GPUReadingTypeClocksVideo, currentValuePath: "/sys/class/devfreq/15480000.nvdec/cur_freq"},
 		{sensorType: sensors.GPUReadingTypeClocksMemory, currentValuePath: "/sys/kernel/debug/clk/emc/clk_rate"},
@@ -37,6 +34,9 @@ var (
 		{sensorType: sensors.GPUReadingTypeClocksJPEG, currentValuePath: "/sys/class/devfreq/15540000.nvjpg/cur_freq"},
 		{sensorType: sensors.GPUReadingTypeClocksVideoImageCompositor, currentValuePath: "/sys/class/devfreq/15340000.vic/cur_freq"},
 		{sensorType: sensors.GPUReadingTypeClocksOFA, currentValuePath: "/sys/class/devfreq/15a50000.ofa/cur_freq"},
+		{sensorType: sensors.GPUReadingTypeUtilizationGPU, currentValuePath: "/sys/devices/platform/bus@0/gpu.0/load", multiplier: 0.1},
+		{sensorType: sensors.GPUReadingTypeMemoryFree, currentValuePath: "/sys/kernel/debug/nvmap/iovmm/free_size", regex: regexp.MustCompile(`([0-9]+)\s+bytes\s*$`)},
+		{sensorType: sensors.GPUReadingTypeMemoryUsed, currentValuePath: "/sys/kernel/debug/nvmap/stats/total_memory"},
 	}
 )
 

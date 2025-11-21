@@ -4,7 +4,7 @@ go 1.23.2
 
 require (
 	github.com/elliotchance/orderedmap/v3 v3.1.0
-	github.com/rinzlerlabs/sbcidentify v0.1.2
+	github.com/rinzlerlabs/sbcidentify v0.1.4
 	github.com/shirou/gopsutil/v4 v4.24.11
 	github.com/stretchr/testify v1.9.0
 	github.com/thegreatco/viamutils v0.0.2

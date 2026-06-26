@@ -21,17 +21,17 @@ type ComponentConfig struct {
 	DisablePIDCaching    bool   `json:"disable_pid_caching"` // Enable caching of PID to avoid repeated lookups
 }
 
-func (conf *ComponentConfig) Validate(path string) ([]string, error) {
+func (conf *ComponentConfig) Validate(path string) ([]string, []string, error) {
 	if conf.ExecutablePath == "" && conf.Name == "" {
-		return nil, errors.New("executable_path or name is required")
+		return nil, nil, errors.New("executable_path or name is required")
 	}
 	if conf.ExecutablePath != "" && conf.Name != "" {
-		return nil, errors.New("only one of executable_path or name is allowed")
+		return nil, nil, errors.New("only one of executable_path or name is allowed")
 	}
 	if conf.ExecutablePath != "" {
 		if _, err := os.Stat(conf.ExecutablePath); os.IsNotExist(err) {
-			return nil, fmt.Errorf("executable_path does not exist: %s", conf.ExecutablePath)
+			return nil, nil, fmt.Errorf("executable_path does not exist: %s", conf.ExecutablePath)
 		}
 	}
-	return nil, nil
+	return nil, nil, nil
 }

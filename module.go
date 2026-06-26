@@ -4,7 +4,7 @@
 package main
 
 import (
-	moduleutils "github.com/thegreatco/viamutils/module"
+	moduleutils "github.com/rinzlerlabs/viamutils/module"
 	"go.viam.com/rdk/module"
 	viamutils "go.viam.com/utils"
 

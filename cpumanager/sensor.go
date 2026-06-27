@@ -5,8 +5,6 @@ package cpumanager
 
 import (
 	"context"
-	"os/exec"
-	"strconv"
 	"sync"
 
 	"github.com/rinzlerlabs/sbcidentify"
@@ -82,9 +80,15 @@ func (c *Config) Reconfigure(ctx context.Context, _ resource.Dependencies, conf 
 		return utils.ErrBoardNotSupported
 	}
 
-	err = utils.InstallPackage("cpufrequtils")
-	if err != nil {
-		c.logger.Errorf("Error installing cpufrequtils: %s", err)
+	// cpufrequtils was removed in Debian Trixie; install its maintained
+	// replacement (linux-cpupower, plus its libcpupower1 runtime library) there
+	// and keep cpufrequtils on older systems.
+	cpuFreqPackages := []string{"cpufrequtils"}
+	if utils.IsDebianTrixieOrNewer() {
+		cpuFreqPackages = []string{"linux-cpupower", "libcpupower1"}
+	}
+	if err = utils.InstallPackage(cpuFreqPackages...); err != nil {
+		c.logger.Errorf("Error installing %v: %s", cpuFreqPackages, err)
 		return err
 	}
 
@@ -93,31 +97,17 @@ func (c *Config) Reconfigure(ctx context.Context, _ resource.Dependencies, conf 
 	c.Minimum = newConf.Minimum
 	c.Maximum = newConf.Maximum
 
-	args := make([]string, 0)
-	if c.Governor != "" {
-		args = append(args, "--governor", c.Governor)
-	}
-	if c.Frequency != 0 {
-		args = append(args, "--freq", strconv.Itoa(c.Frequency))
-	}
-	if c.Minimum != 0 {
-		args = append(args, "--min", strconv.Itoa(c.Minimum))
-	}
-	if c.Maximum != 0 {
-		args = append(args, "--max", strconv.Itoa(c.Maximum))
-	}
-
-	if len(args) > 0 {
-		proc := exec.Command("cpufreq-set", args...)
-
-		outputBytes, err := proc.Output()
-		if err != nil {
-			c.logger.Errorf("Error configuring CPU: %s", err)
-		}
-		c.logger.Infof("CPU configured: %s", string(outputBytes))
-	} else {
+	if c.Governor == "" && c.Frequency == 0 && c.Minimum == 0 && c.Maximum == 0 {
 		c.logger.Info("No configuration changes made")
+		return nil
 	}
+
+	output, err := applyCPUPolicy(c.Governor, c.Frequency, c.Minimum, c.Maximum)
+	if err != nil {
+		c.logger.Errorf("Error configuring CPU: %s: %s", err, output)
+		return err
+	}
+	c.logger.Infof("CPU configured: %s", output)
 
 	return nil
 }

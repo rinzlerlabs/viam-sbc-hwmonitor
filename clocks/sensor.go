@@ -85,11 +85,11 @@ func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (ma
 	defer c.mu.RUnlock()
 	readings := make(map[string]interface{})
 	for _, s := range c.sensors {
-		readings, err := s.GetReadingMap()
+		sensorReadings, err := s.GetReadingMap()
 		if err != nil {
 			return nil, err
 		}
-		for k, v := range readings {
+		for k, v := range sensorReadings {
 			readings[k] = v
 		}
 	}

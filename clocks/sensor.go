@@ -87,12 +87,23 @@ func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (ma
 	for _, s := range c.sensors {
 		sensorReadings, err := s.GetReadingMap()
 		if err != nil {
-			return nil, err
+			// Skip a failing sensor rather than failing the whole component;
+			// one unreadable clock shouldn't blank every reading.
+			c.logger.Warnf("failed to read clock sensor %s: %v", s.Name(), err)
+			continue
 		}
 		for k, v := range sensorReadings {
 			readings[k] = v
 		}
 	}
+
+	// An empty map serializes to nil over gRPC, which the sensor service
+	// rejects ("Readings should not return nil readings").
+	if len(readings) == 0 {
+		c.logger.Warn("no clock readings available")
+		readings["error"] = "no clock readings available"
+	}
+
 	return readings, nil
 }
 

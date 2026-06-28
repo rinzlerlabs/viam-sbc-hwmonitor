@@ -8,5 +8,5 @@ import (
 )
 
 func GetClockSensors(ctx context.Context, logger logging.Logger) ([]sensors.ClockSensor, error) {
-	return nil, nil
+	return sensors.GetSysFsClockSensors(ctx, logger)
 }

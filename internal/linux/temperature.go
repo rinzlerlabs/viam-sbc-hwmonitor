@@ -7,6 +7,5 @@ import (
 )
 
 func GetTemperatures(ctx context.Context) (*sensors.SystemTemperatures, error) {
-	systemTemps := &sensors.SystemTemperatures{Extra: make(map[string]float64)}
-	return systemTemps, nil
+	return sensors.ReadSysfsThermalZones(ctx)
 }

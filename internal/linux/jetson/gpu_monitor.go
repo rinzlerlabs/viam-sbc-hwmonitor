@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 
 	"go.viam.com/rdk/logging"
@@ -17,28 +18,43 @@ var (
 	ErrDevicePathNotFound = errors.New("device path not found")
 	ErrStatsNotAvailable  = errors.New("stats not available for this device")
 
-	jetpack5Sensors = []jetsonGpuSensor{
-		{sensorType: sensors.GPUReadingTypeClocksGraphics, currentValuePath: "/sys/class/devfreq/17000000.ga10b/cur_freq"},
+	// candidateGpuSensors is the union of known Jetson sysfs sources across
+	// generations (Nano, Xavier, Orin) and JetPack versions. getJetsonGpuSensors
+	// keeps only the ones whose source file actually exists on this board, so a
+	// single list works everywhere rather than guessing the board first.
+	candidateGpuSensors = []jetsonGpuSensor{
+		// GPU graphics clock (devfreq node differs by board)
+		{sensorType: sensors.GPUReadingTypeClocksGraphics, currentValuePath: "/sys/class/devfreq/17000000.gpu/cur_freq"},    // Orin JetPack 6
+		{sensorType: sensors.GPUReadingTypeClocksGraphics, currentValuePath: "/sys/class/devfreq/17000000.ga10b/cur_freq"},  // Orin JetPack 5
+		{sensorType: sensors.GPUReadingTypeClocksGraphics, currentValuePath: "/sys/class/devfreq/57000000.gpu/cur_freq"},    // Nano
+		// Other engine clocks (present only on newer boards)
 		{sensorType: sensors.GPUReadingTypeClocksVideo, currentValuePath: "/sys/class/devfreq/15480000.nvdec/cur_freq"},
-		{sensorType: sensors.GPUReadingTypeClocksMemory, currentValuePath: "/sys/kernel/debug/clk/emc/clk_rate"},
-		{sensorType: sensors.GPUReadingTypeClocksVideoImageCompositor, currentValuePath: "/sys/class/devfreq/15340000.vic/cur_freq"},
-		{sensorType: sensors.GPUReadingTypeUtilizationGPU, currentValuePath: "/sys/devices/platform/gpu.0/load", multiplier: 0.1},
-		{sensorType: sensors.GPUReadingTypeMemoryFree, currentValuePath: "/sys/kernel/debug/nvmap/iovmm/free_size", regex: regexp.MustCompile(`([0-9]+)\s+bytes\s*$`)},
-		{sensorType: sensors.GPUReadingTypeMemoryUsed, currentValuePath: "/sys/kernel/debug/nvmap/stats/total_memory"},
-	}
-	jetpack6Sensors = []jetsonGpuSensor{
-		{sensorType: sensors.GPUReadingTypeClocksGraphics, currentValuePath: "/sys/class/devfreq/17000000.gpu/cur_freq"},
-		{sensorType: sensors.GPUReadingTypeClocksVideo, currentValuePath: "/sys/class/devfreq/15480000.nvdec/cur_freq"},
-		{sensorType: sensors.GPUReadingTypeClocksMemory, currentValuePath: "/sys/kernel/debug/clk/emc/clk_rate"},
 		{sensorType: sensors.GPUReadingTypeClocksJPEG, currentValuePath: "/sys/class/devfreq/15380000.nvjpg/cur_freq"},
 		{sensorType: sensors.GPUReadingTypeClocksJPEG, currentValuePath: "/sys/class/devfreq/15540000.nvjpg/cur_freq"},
 		{sensorType: sensors.GPUReadingTypeClocksVideoImageCompositor, currentValuePath: "/sys/class/devfreq/15340000.vic/cur_freq"},
 		{sensorType: sensors.GPUReadingTypeClocksOFA, currentValuePath: "/sys/class/devfreq/15a50000.ofa/cur_freq"},
-		{sensorType: sensors.GPUReadingTypeUtilizationGPU, currentValuePath: "/sys/devices/platform/bus@0/gpu.0/load", multiplier: 0.1},
+		{sensorType: sensors.GPUReadingTypeClocksMemory, currentValuePath: "/sys/kernel/debug/clk/emc/clk_rate"},
+		// GPU utilization / load (path differs by board)
+		{sensorType: sensors.GPUReadingTypeUtilizationGPU, currentValuePath: "/sys/devices/platform/bus@0/gpu.0/load", multiplier: 0.1}, // Orin JetPack 6
+		{sensorType: sensors.GPUReadingTypeUtilizationGPU, currentValuePath: "/sys/devices/platform/gpu.0/load", multiplier: 0.1},       // Orin JetPack 5
+		{sensorType: sensors.GPUReadingTypeUtilizationGPU, currentValuePath: "/sys/devices/57000000.gpu/load", multiplier: 0.1},         // Nano
+		{sensorType: sensors.GPUReadingTypeUtilizationGPU, currentValuePath: "/sys/devices/gpu.0/load", multiplier: 0.1},                // Nano (symlink)
+		// Memory usage
 		{sensorType: sensors.GPUReadingTypeMemoryFree, currentValuePath: "/sys/kernel/debug/nvmap/iovmm/free_size", regex: regexp.MustCompile(`([0-9]+)\s+bytes\s*$`)},
 		{sensorType: sensors.GPUReadingTypeMemoryUsed, currentValuePath: "/sys/kernel/debug/nvmap/stats/total_memory"},
 	}
 )
+
+// HasJetsonGpu reports whether a Tegra integrated GPU is present via its devfreq
+// node. This is used to route to the Jetson GPU monitor even when board
+// identification fails (nvidia-smi does not work on Tegra integrated GPUs).
+func HasJetsonGpu() bool {
+	matches, err := filepath.Glob("/sys/class/devfreq/*.gpu")
+	if err != nil {
+		return false
+	}
+	return len(matches) > 0
+}
 
 func NewJetsonGpuMonitor(logger logging.Logger) (*jetsonGpuMonitor, error) {
 	gpuSensors, err := getJetsonGpuSensors()
@@ -101,13 +117,16 @@ func (s *jetsonGpuSensor) GetSensorReading(ctx context.Context) (*sensors.GPUSen
 }
 
 func getJetsonGpuSensors() ([]jetsonGpuSensor, error) {
-	if _, err := os.Stat(jetpack5Sensors[0].currentValuePath); !os.IsNotExist(err) {
-		return jetpack5Sensors, nil
-	} else if _, err := os.Stat(jetpack6Sensors[0].currentValuePath); !os.IsNotExist(err) {
-		return jetpack6Sensors, nil
+	found := make([]jetsonGpuSensor, 0, len(candidateGpuSensors))
+	for _, sensor := range candidateGpuSensors {
+		if _, err := os.Stat(sensor.currentValuePath); err == nil {
+			found = append(found, sensor)
+		}
 	}
-
-	return nil, errors.New("no load sensors found")
+	if len(found) == 0 {
+		return nil, errors.New("no GPU sensors found")
+	}
+	return found, nil
 }
 
 func (m *jetsonGpuMonitor) GetGPUStats(ctx context.Context) (map[string][]sensors.GPUSensorReading, error) {

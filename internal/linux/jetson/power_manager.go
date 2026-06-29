@@ -58,7 +58,8 @@ func (pm *jetsonPowerManager) ApplyPowerMode() (rebootRequired bool, err error) 
 		}
 		return false, fmt.Errorf("failed to set power mode: %v, output: %s", err, string(output))
 	}
-	return true, nil
+	// nvpmodel applied the mode immediately; no reboot needed.
+	return false, nil
 }
 
 // isRebootRequiredOutput reports whether nvpmodel declined the mode change

@@ -26,14 +26,15 @@ var (
 
 type Config struct {
 	resource.Named
-	mu         sync.RWMutex
-	logger     logging.Logger
-	cancelCtx  context.Context
-	cancelFunc func()
-	Governor   string
-	Frequency  int
-	Minimum    int
-	Maximum    int
+	mu          sync.RWMutex
+	logger      logging.Logger
+	cancelCtx   context.Context
+	cancelFunc  func()
+	unsupported bool
+	Governor    string
+	Frequency   int
+	Minimum     int
+	Maximum     int
 }
 
 func init() {
@@ -75,9 +76,13 @@ func (c *Config) Reconfigure(ctx context.Context, _ resource.Dependencies, conf 
 	// In case the module has changed name
 	c.Named = conf.ResourceName().AsNamed()
 
-	if !sbcidentify.IsRaspberryPi() {
-		c.logger.Errorf("This sensor is only supported on Raspberry Pi")
-		return utils.ErrBoardNotSupported
+	// This sensor only supports the Raspberry Pi. Rather than failing the
+	// resource build on other boards, mark it unsupported and report that in
+	// Readings so the component still comes up cleanly.
+	c.unsupported = !sbcidentify.IsRaspberryPi()
+	if c.unsupported {
+		c.logger.Warn("cpu_manager is only supported on Raspberry Pi; reporting unsupported")
+		return nil
 	}
 
 	// cpufrequtils was removed in Debian Trixie; install its maintained
@@ -115,6 +120,11 @@ func (c *Config) Reconfigure(ctx context.Context, _ resource.Dependencies, conf 
 func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
+	if c.unsupported {
+		return map[string]interface{}{
+			"error": "cpu_manager is only supported on Raspberry Pi",
+		}, nil
+	}
 	min, max, governor, err := getCurrentPolicy()
 	if err != nil {
 		return nil, err

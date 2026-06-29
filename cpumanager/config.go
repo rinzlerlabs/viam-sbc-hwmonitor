@@ -7,6 +7,8 @@ import (
 	"errors"
 	"slices"
 	"strconv"
+
+	"github.com/rinzlerlabs/viam-sbc-hwmonitor/powermanager/cpufrequtils"
 )
 
 type ComponentConfig struct {
@@ -18,7 +20,7 @@ type ComponentConfig struct {
 
 func (conf *ComponentConfig) Validate(path string) ([]string, []string, error) {
 	if conf.Governor != "" {
-		availableGovernors, err := getAvailableGovernors()
+		availableGovernors, err := cpufrequtils.GetAvailableGovernors()
 		if err != nil {
 			return nil, nil, err
 		}
@@ -28,7 +30,7 @@ func (conf *ComponentConfig) Validate(path string) ([]string, []string, error) {
 	}
 
 	if conf.Frequency != 0 {
-		min, max, err := getFrequencyLimits()
+		min, max, err := cpufrequtils.GetFrequencyLimits()
 		if err != nil {
 			return nil, nil, err
 		}

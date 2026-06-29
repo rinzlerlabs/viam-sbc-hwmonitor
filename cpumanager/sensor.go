@@ -13,6 +13,7 @@ import (
 	"go.viam.com/rdk/resource"
 
 	"github.com/rinzlerlabs/viam-sbc-hwmonitor/powermanager"
+	"github.com/rinzlerlabs/viam-sbc-hwmonitor/powermanager/cpufrequtils"
 	"github.com/rinzlerlabs/viam-sbc-hwmonitor/utils"
 )
 
@@ -107,7 +108,7 @@ func (c *Config) Reconfigure(ctx context.Context, _ resource.Dependencies, conf 
 		return nil
 	}
 
-	output, err := applyCPUPolicy(c.Governor, c.Frequency, c.Minimum, c.Maximum)
+	output, err := cpufrequtils.ApplyPolicy(c.Governor, c.Frequency, c.Minimum, c.Maximum)
 	if err != nil {
 		c.logger.Errorf("Error configuring CPU: %s: %s", err, output)
 		return err
@@ -125,12 +126,12 @@ func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (ma
 			"error": "cpu_manager is only supported on Raspberry Pi",
 		}, nil
 	}
-	min, max, governor, err := getCurrentPolicy()
+	min, max, governor, err := cpufrequtils.GetCurrentPolicy()
 	if err != nil {
 		return nil, err
 
 	}
-	currentFrequency, err := getCurrentFrequency()
+	currentFrequency, err := cpufrequtils.GetCurrentFrequency()
 	if err != nil {
 		return nil, err
 	}

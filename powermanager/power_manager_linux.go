@@ -28,7 +28,9 @@ func newPowerManager(config *ComponentConfig, logger logging.Logger) (PowerManag
 		return nil, errors.Join(err, errors.New("error installing "+strings.Join(cpuFreqPackages, ", ")))
 	}
 
-	if sbcidentify.IsJetson() {
+	// Detect a Tegra GPU directly in addition to board identification, since
+	// sbcidentify can fail to identify some Jetsons (e.g. Orin).
+	if sbcidentify.IsJetson() || jetson.HasJetsonGpu() {
 		if config.Jetson == nil {
 			return nil, ErrNoConfigForBoard
 		}

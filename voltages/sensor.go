@@ -94,6 +94,14 @@ func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (ma
 			ret[name+"_"+k] = v
 		}
 	}
+
+	// An empty map serializes to nil over gRPC, which the sensor service
+	// rejects ("Readings should not return nil readings").
+	if len(ret) == 0 {
+		c.logger.Warn("no voltage readings available")
+		ret["error"] = "no voltage readings available"
+	}
+
 	return ret, nil
 }
 

@@ -81,16 +81,20 @@ func (pm *jetsonPowerManager) getCurrentPowerMode() (int, error) {
 	return parsePowerModeOutput(string(output))
 }
 
+// parsePowerModeOutput extracts the active power mode from `nvpmodel -q` output.
+// The output contains a label line ("NV Power Mode: MAXN") and a separate line
+// with the numeric mode, but the line ordering/blank lines vary across boards,
+// so we scan for the first line that parses as an integer rather than assuming
+// a fixed index.
 func parsePowerModeOutput(output string) (int, error) {
-	lines := strings.Split(output, "\n")
-	if len(lines) < 2 {
-		return 0, errors.New("unexpected output format")
+	for _, line := range strings.Split(output, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		if mode, err := strconv.Atoi(line); err == nil {
+			return mode, nil
+		}
 	}
-	powerModeLine := lines[1]
-	powerMode := strings.TrimSpace(powerModeLine)
-	powerModeInt, err := strconv.Atoi(powerMode)
-	if err != nil {
-		return 0, fmt.Errorf("failed to parse power mode: %v", err)
-	}
-	return powerModeInt, nil
+	return 0, fmt.Errorf("could not find power mode in nvpmodel output: %q", output)
 }

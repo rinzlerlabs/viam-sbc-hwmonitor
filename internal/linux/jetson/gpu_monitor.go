@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"regexp"
 
 	"go.viam.com/rdk/logging"
@@ -45,15 +44,15 @@ var (
 	}
 )
 
-// HasJetsonGpu reports whether a Tegra integrated GPU is present via its devfreq
-// node. This is used to route to the Jetson GPU monitor even when board
-// identification fails (nvidia-smi does not work on Tegra integrated GPUs).
+// HasJetsonGpu reports whether a Tegra integrated GPU is present by checking for
+// any of the known Jetson sysfs sources. This is used to route to the Jetson GPU
+// monitor even when board identification fails (nvidia-smi does not work on Tegra
+// integrated GPUs). It shares candidateGpuSensors with getJetsonGpuSensors so
+// detection stays consistent across boards and JetPack versions (e.g. the Orin
+// JetPack 5 ".ga10b" devfreq node, which a "*.gpu" glob would miss).
 func HasJetsonGpu() bool {
-	matches, err := filepath.Glob("/sys/class/devfreq/*.gpu")
-	if err != nil {
-		return false
-	}
-	return len(matches) > 0
+	_, err := getJetsonGpuSensors()
+	return err == nil
 }
 
 func NewJetsonGpuMonitor(logger logging.Logger) (*jetsonGpuMonitor, error) {

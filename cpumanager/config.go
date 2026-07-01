@@ -16,25 +16,25 @@ type ComponentConfig struct {
 	Maximum   int    `json:"maximum"`
 }
 
-func (conf *ComponentConfig) Validate(path string) ([]string, error) {
+func (conf *ComponentConfig) Validate(path string) ([]string, []string, error) {
 	if conf.Governor != "" {
 		availableGovernors, err := getAvailableGovernors()
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		if !slices.Contains(availableGovernors, conf.Governor) {
-			return nil, errors.New("unknown governor")
+			return nil, nil, errors.New("unknown governor")
 		}
 	}
 
 	if conf.Frequency != 0 {
 		min, max, err := getFrequencyLimits()
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		if conf.Frequency > max || conf.Frequency < min {
-			return nil, errors.New("frequency out of range. valid range: " + strconv.Itoa(min) + " - " + strconv.Itoa(max))
+			return nil, nil, errors.New("frequency out of range. valid range: " + strconv.Itoa(min) + " - " + strconv.Itoa(max))
 		}
 	}
-	return nil, nil
+	return nil, nil, nil
 }

@@ -10,6 +10,6 @@ type ComponentConfig struct {
 	Raspi  *raspberrypi.PowerManagerConfig `json:"raspi"`
 }
 
-func (conf *ComponentConfig) Validate(path string) ([]string, error) {
-	return nil, nil
+func (conf *ComponentConfig) Validate(path string) ([]string, []string, error) {
+	return nil, nil, nil
 }

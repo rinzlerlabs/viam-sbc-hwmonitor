@@ -727,8 +727,8 @@ github.com/prometheus/procfs v0.3.0/go.mod h1:lV6e/gmhEcM9IjHGsFOCxxuZ+z1YqCvr4O
 github.com/prometheus/procfs v0.15.1 h1:YagwOFzUgYfKKHX6Dr+sHT7km/hxC76UB0learggepc=
 github.com/prometheus/procfs v0.15.1/go.mod h1:fB45yRUv8NstnjriLhBQLuOUt+WW4BsoGhij/e3PBqk=
 github.com/rcrowley/go-metrics v0.0.0-20181016184325-3113b8401b8a/go.mod h1:bCqnVzQkZxMG4s8nGwiZ5l3QUCyqpo9Y+/ZMZ9VjZe4=
-github.com/rinzlerlabs/sbcidentify v0.1.4 h1:HG6GRzdSttu6/X25T0rWVODakF0UHMPJ13YKqPjnWw4=
-github.com/rinzlerlabs/sbcidentify v0.1.4/go.mod h1:ud+PH8+YnavAPHJNqaWgfhNouQmEYCs3wMN4OKGN6UM=
+github.com/rinzlerlabs/sbcidentify v0.2.0 h1:Zw/APaZ/SZYPwlGZXokgBYzwkXZZE2KKK//Ny3z//7c=
+github.com/rinzlerlabs/sbcidentify v0.2.0/go.mod h1:ud+PH8+YnavAPHJNqaWgfhNouQmEYCs3wMN4OKGN6UM=
 github.com/rinzlerlabs/viamutils v0.0.7 h1:8CoHdjx4RVefgya6hINm+hZNsH4jRxrtwne9Ft/F6E8=
 github.com/rinzlerlabs/viamutils v0.0.7/go.mod h1:z4t6eU3n1rEta2LIfmDiHH2loxzK/ZwLLkRDx6JPzEw=
 github.com/rivo/uniseg v0.2.0/go.mod h1:J6wj4VEh+S6ZtnVlnTBMWIodfgj8LQOQFoIToxlJtxc=

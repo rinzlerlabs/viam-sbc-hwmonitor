@@ -1,24 +1,41 @@
-FROM golang:1.23-bookworm
-ENV GOLANG_VERSION 1.23.7
+# syntax=docker/dockerfile:1.6
+FROM golang:1.26-bookworm
 
-RUN apt update && apt install -y \
-    build-essential \
-    git \
-    curl \
-    ssh 
+# ---- Base dev utilities ----
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+      ca-certificates \
+      curl \
+      git \
+      bash \
+      openssh-client \
+      unzip \
+      nano \
+    && rm -rf /var/lib/apt/lists/*
 
 # Install Viam RDK CLI
 RUN ARCH=$(go env GOARCH) && \
     curl -o /usr/local/bin/viam https://storage.googleapis.com/packages.viam.com/apps/viam-cli/viam-cli-stable-linux-${ARCH} && \
     chmod a+rx /usr/local/bin/viam
 
-ENV PATH=/usr/local/go/bin:${PATH}
-RUN groupadd -g 1000 user
-RUN useradd -u 1000 -g 1000 -m -s /bin/bash user
-RUN usermod -aG sudo user
-RUN echo "user ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
-RUN cat /etc/passwd
+# ---- Create non-root vscode user ----
+ARG USERNAME=vscode
+ARG USER_UID=1000
+ARG USER_GID=1000
 
-WORKDIR /workspace
+RUN groupadd --gid ${USER_GID} ${USERNAME} \
+  && useradd --uid ${USER_UID} --gid ${USER_GID} -m ${USERNAME} \
+  && mkdir -p /workspaces /home/vscode/go /go/pkg/mod \
+  && chown -R ${USERNAME}:${USERNAME} /workspaces /home/vscode/go /go
+
+ENV GOPATH="/home/vscode/go"
+ENV GOMODCACHE="/go/pkg/mod"
+WORKDIR /workspaces
 USER ${USERNAME}
+
+# ---- Install common Go tools ----
+RUN go install golang.org/x/tools/gopls@latest \
+ && go install honnef.co/go/tools/cmd/staticcheck@latest \
+ && go install golang.org/x/tools/cmd/goimports@latest
+
 CMD ["/bin/bash"]

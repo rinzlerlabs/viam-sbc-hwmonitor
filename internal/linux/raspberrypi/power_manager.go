@@ -2,9 +2,8 @@ package raspberrypi
 
 import (
 	"errors"
-	"os/exec"
-	"strconv"
 
+	"github.com/rinzlerlabs/viam-sbc-hwmonitor/powermanager/cpufrequtils"
 	"go.viam.com/rdk/logging"
 )
 
@@ -32,31 +31,18 @@ func NewPowerManager(config *PowerManagerConfig, logger logging.Logger) (*raspiP
 }
 
 func (pm *raspiPowerManager) ApplyPowerMode() (bool, error) {
-	args := make([]string, 0)
-	if pm.config.Governor != "" {
-		args = append(args, "--governor", pm.config.Governor)
-	}
-	if pm.config.Frequency != 0 {
-		args = append(args, "--freq", strconv.Itoa(pm.config.Frequency))
-	}
-	if pm.config.Minimum != 0 {
-		args = append(args, "--min", strconv.Itoa(pm.config.Minimum))
-	}
-	if pm.config.Maximum != 0 {
-		args = append(args, "--max", strconv.Itoa(pm.config.Maximum))
-	}
-
-	if len(args) > 0 {
-		proc := exec.Command("cpufreq-set", args...)
-
-		outputBytes, err := proc.Output()
-		if err != nil {
-			pm.logger.Errorf("Error configuring CPU: %s", err)
-		}
-		pm.logger.Infof("CPU configured: %s", string(outputBytes))
-	} else {
+	cfg := pm.config
+	if cfg.Governor == "" && cfg.Frequency == 0 && cfg.Minimum == 0 && cfg.Maximum == 0 {
 		pm.logger.Info("No configuration changes made")
+		return false, nil
 	}
+
+	output, err := cpufrequtils.ApplyPolicy(cfg.Governor, cfg.Frequency, cfg.Minimum, cfg.Maximum)
+	if err != nil {
+		pm.logger.Errorf("Error configuring CPU: %s: %s", err, output)
+		return false, err
+	}
+	pm.logger.Infof("CPU configured: %s", output)
 	return false, nil
 }
 

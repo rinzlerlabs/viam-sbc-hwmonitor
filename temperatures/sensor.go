@@ -92,6 +92,14 @@ func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (ma
 		res[key] = value
 	}
 
+	// An empty map serializes to nil over gRPC, which the sensor service
+	// rejects ("Readings should not return nil readings"). Surface the
+	// condition in the logs and readings instead of returning empty.
+	if len(res) == 0 {
+		c.logger.Warn("no temperature readings available")
+		res["error"] = "no temperature readings available"
+	}
+
 	return res, nil
 }
 

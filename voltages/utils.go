@@ -14,8 +14,9 @@ import (
 func getPowerSensors(ctx context.Context, logger logging.Logger) ([]sensors.PowerSensor, error) {
 	if sbcidentify.IsBoardType(boardtype.RaspberryPi) {
 		return raspberrypi.GetPowerSensors(ctx, logger)
-	} else if sbcidentify.IsBoardType(boardtype.NVIDIA) {
-		return jetson.GetPowerSensors(ctx, logger)
 	}
-	return make([]sensors.PowerSensor, 0), nil
+	// All other Linux boards: discover INA3221 power monitors via sysfs (Jetson
+	// and similar). Returns an empty set if no supported monitor is present.
+	// Not gated on board identification, which can fail on some Jetsons (Orin).
+	return jetson.GetPowerSensors(ctx, logger)
 }

@@ -34,45 +34,68 @@ func NewPowerManager(config *PowerManagerConfig, logger logging.Logger) (*jetson
 }
 
 func (pm *jetsonPowerManager) ApplyPowerMode() (rebootRequired bool, err error) {
-	currentPowerMode, err := pm.GetCurrentPowerMode()
+	currentPowerMode, err := pm.getCurrentPowerMode()
 	if err != nil {
 		return false, fmt.Errorf("failed to get current power mode: %v", err)
-	}
-	if currentPowerMode == nil {
-		return false, errors.New("current power mode is nil")
 	}
 	if currentPowerMode == pm.config.PowerMode {
 		pm.logger.Debugf("Power mode is already set to %d", pm.config.PowerMode)
 		return false, nil
 	}
+
 	cmd := exec.Command("nvpmodel", "-m", fmt.Sprintf("%d", pm.config.PowerMode))
+	// Decline nvpmodel's interactive reboot prompt; we never reboot the device
+	// automatically. A reboot-required change is reported back to the caller.
 	cmd.Stdin = strings.NewReader("no\n")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
+		// nvpmodel exits non-zero when the requested mode needs a reboot and our
+		// "no" answer aborted it. Treat that as a non-fatal "reboot required"
+		// result rather than failing the component build.
+		if isRebootRequiredOutput(string(output)) {
+			pm.logger.Warnf("Power mode %d requires a reboot to take effect. Run 'sudo nvpmodel -m %d' on the device (confirm the reboot prompt), or reboot after running it, to apply it.", pm.config.PowerMode, pm.config.PowerMode)
+			return true, nil
+		}
 		return false, fmt.Errorf("failed to set power mode: %v, output: %s", err, string(output))
 	}
-	return true, nil
+	// nvpmodel applied the mode immediately; no reboot needed.
+	return false, nil
+}
+
+// isRebootRequiredOutput reports whether nvpmodel declined the mode change
+// because a reboot is required (our non-interactive "no" answer aborted it).
+func isRebootRequiredOutput(output string) bool {
+	return strings.Contains(output, "Reboot required")
 }
 
 func (pm *jetsonPowerManager) GetCurrentPowerMode() (interface{}, error) {
+	return pm.getCurrentPowerMode()
+}
+
+// getCurrentPowerMode returns the active nvpmodel power mode as an integer.
+func (pm *jetsonPowerManager) getCurrentPowerMode() (int, error) {
 	cmd := exec.Command("nvpmodel", "-q")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get current power mode: %v, output: %s", err, string(output))
+		return 0, fmt.Errorf("failed to get current power mode: %v, output: %s", err, string(output))
 	}
-	return strings.TrimSpace(string(output)), nil
+	return parsePowerModeOutput(string(output))
 }
 
+// parsePowerModeOutput extracts the active power mode from `nvpmodel -q` output.
+// The output contains a label line ("NV Power Mode: MAXN") and a separate line
+// with the numeric mode, but the line ordering/blank lines vary across boards,
+// so we scan for the first line that parses as an integer rather than assuming
+// a fixed index.
 func parsePowerModeOutput(output string) (int, error) {
-	lines := strings.Split(output, "\n")
-	if len(lines) < 2 {
-		return 0, errors.New("unexpected output format")
+	for _, line := range strings.Split(output, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		if mode, err := strconv.Atoi(line); err == nil {
+			return mode, nil
+		}
 	}
-	powerModeLine := lines[1]
-	powerMode := strings.TrimSpace(powerModeLine)
-	powerModeInt, err := strconv.Atoi(powerMode)
-	if err != nil {
-		return 0, fmt.Errorf("failed to parse power mode: %v", err)
-	}
-	return powerModeInt, nil
+	return 0, fmt.Errorf("could not find power mode in nvpmodel output: %q", output)
 }

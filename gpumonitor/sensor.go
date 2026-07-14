@@ -2,6 +2,7 @@ package gpumonitor
 
 import (
 	"context"
+	"errors"
 	"sync"
 
 	"go.viam.com/rdk/components/sensor"
@@ -74,6 +75,13 @@ func (c *Config) Reconfigure(ctx context.Context, _ resource.Dependencies, conf 
 	c.Named = conf.ResourceName().AsNamed()
 	c.gpuMonitor, err = newGpuMonitor(c.logger)
 	if err != nil {
+		// On boards without a supported GPU (e.g. Raspberry Pi), don't fail the
+		// resource build; come up and report the condition in Readings instead.
+		if errors.Is(err, ErrUnsupportedBoard) {
+			c.logger.Warnf("%s: %v", PrettyName, err)
+			c.gpuMonitor = nil
+			return nil
+		}
 		return err
 	}
 	c.logger.Debugf("reconfigure complete %s", PrettyName)
@@ -84,6 +92,11 @@ func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (ma
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	m := make(map[string]interface{})
+	if c.gpuMonitor == nil {
+		return map[string]interface{}{
+			"error": ErrUnsupportedBoard.Error(),
+		}, nil
+	}
 	sample, err := c.gpuMonitor.GetGPUStats(ctx)
 	if err != nil {
 		return nil, err

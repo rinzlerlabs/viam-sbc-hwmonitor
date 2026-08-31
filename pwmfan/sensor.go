@@ -66,9 +66,11 @@ func (c *Config) Reconfigure(ctx context.Context, deps resource.Dependencies, co
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.logger.Infof("Reconfiguring %s", PrettyName)
-	c.logger.Debug("Stopping background worker")
-	c.worker.Stop()
-	c.logger.Debugf("Background worker stopped")
+	if c.worker != nil {
+		c.logger.Debug("Stopping background worker")
+		c.worker.Stop()
+		c.logger.Debugf("Background worker stopped")
+	}
 
 	newConf, err := resource.NativeConfig[*CloudConfig](conf)
 	if err != nil {

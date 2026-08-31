@@ -34,7 +34,7 @@ func TestJetsonGpuGetsFrequencies(t *testing.T) {
 
 func TestJetsonGPUReadingTypeMemoryFree(t *testing.T) {
 	var sensor jetsonGpuSensor
-	for _, sensor = range jetpack5Sensors {
+	for _, sensor = range candidateGpuSensors {
 		if sensor.sensorType == sensors.GPUReadingTypeMemoryFree {
 			break
 		}

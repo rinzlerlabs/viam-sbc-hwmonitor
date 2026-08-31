@@ -29,7 +29,10 @@ type gpuMonitor interface {
 }
 
 func newGpuMonitor(logger logging.Logger) (gpuMonitor, error) {
-	if sbcidentify.IsBoardType(boardtype.NVIDIA) {
+	// Prefer the Jetson sysfs monitor for Tegra integrated GPUs. Check for the
+	// GPU sysfs node directly (not just board identification), since detection
+	// can fail on some Jetsons (e.g. Orin) and nvidia-smi does not work on Tegra.
+	if sbcidentify.IsBoardType(boardtype.NVIDIA) || jetson.HasJetsonGpu() {
 		return jetson.NewJetsonGpuMonitor(logger)
 	} else if sensors.HasNvidiaSmiCommand(logger) {
 		return sensors.NewNVIDIAGpuMonitor(logger)

@@ -2,32 +2,40 @@ package utils
 
 import (
 	"errors"
+	"fmt"
 	"os/exec"
 	"strings"
 )
 
 var ErrNoPackageManagerFound = errors.New("no package manager found")
 
-func InstallPackage(packageName string) error {
-	if isAptInstalled() {
-		proc := exec.Command("apt", "install", packageName, "-y")
-		_, err := proc.Output()
-		if err != nil {
-			return err
-		}
+func InstallPackage(packageNames ...string) error {
+	if len(packageNames) == 0 {
 		return nil
 	}
 
-	if isYumInstalled() {
-		proc := exec.Command("yum", "install", packageName, "-y")
-		_, err := proc.Output()
-		if err != nil {
-			return err
-		}
+	args := append([]string{"install"}, packageNames...)
+	args = append(args, "-y")
 
-		return nil
+	switch {
+	case isAptInstalled():
+		return runInstall("apt", args...)
+	case isYumInstalled():
+		return runInstall("yum", args...)
+	default:
+		return ErrNoPackageManagerFound
 	}
-	return ErrNoPackageManagerFound
+}
+
+// runInstall executes a package-manager command, capturing stderr so a failure
+// surfaces the underlying message (e.g. apt's "Permission denied" or "Unable to
+// locate package") instead of a bare "exit status 100".
+func runInstall(name string, args ...string) error {
+	output, err := exec.Command(name, args...).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("%s %s failed: %w: %s", name, strings.Join(args, " "), err, strings.TrimSpace(string(output)))
+	}
+	return nil
 }
 
 func isAptInstalled() bool {

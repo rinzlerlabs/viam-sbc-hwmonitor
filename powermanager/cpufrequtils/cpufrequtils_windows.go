@@ -2,6 +2,10 @@ package cpufrequtils
 
 import "github.com/rinzlerlabs/viam-sbc-hwmonitor/utils"
 
+func ApplyPolicy(governor string, frequency, minimum, maximum int) (string, error) {
+	return "", utils.ErrPlatformNotSupported
+}
+
 func SetGovernor(governor string) error {
 	return utils.ErrPlatformNotSupported
 }

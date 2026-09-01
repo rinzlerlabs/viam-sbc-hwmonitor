@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/rinzlerlabs/viam-sbc-hwmonitor/powermanager/cpufrequtils"
 	"go.viam.com/rdk/logging"
 )
 
@@ -40,26 +41,39 @@ func (pm *jetsonPowerManager) ApplyPowerMode() (rebootRequired bool, err error) 
 	}
 	if currentPowerMode == pm.config.PowerMode {
 		pm.logger.Debugf("Power mode is already set to %d", pm.config.PowerMode)
-		return false, nil
+	} else {
+		cmd := exec.Command("nvpmodel", "-m", fmt.Sprintf("%d", pm.config.PowerMode))
+		// Decline nvpmodel's interactive reboot prompt; we never reboot the
+		// device automatically. A reboot-required change is reported back to
+		// the caller.
+		cmd.Stdin = strings.NewReader("no\n")
+		output, cmdErr := cmd.CombinedOutput()
+		// nvpmodel's exit code for a declined reboot prompt isn't documented
+		// and isn't consistent to rely on, so check the output text
+		// regardless of whether the command itself exited zero or non-zero.
+		if isRebootRequiredOutput(string(output)) {
+			pm.logger.Warnf("Power mode %d requires a reboot to take effect. Run 'sudo nvpmodel -m %d' on the device (confirm the reboot prompt), or reboot after running it, to apply it.", pm.config.PowerMode, pm.config.PowerMode)
+			rebootRequired = true
+		} else if cmdErr != nil {
+			return false, fmt.Errorf("failed to set power mode: %v, output: %s", cmdErr, string(output))
+		}
 	}
 
-	cmd := exec.Command("nvpmodel", "-m", fmt.Sprintf("%d", pm.config.PowerMode))
-	// Decline nvpmodel's interactive reboot prompt; we never reboot the device
-	// automatically. A reboot-required change is reported back to the caller.
-	cmd.Stdin = strings.NewReader("no\n")
-	output, err := cmd.CombinedOutput()
-	// nvpmodel's exit code for a declined reboot prompt isn't documented and
-	// isn't consistent to rely on, so check the output text regardless of
-	// whether the command itself exited zero or non-zero.
-	if isRebootRequiredOutput(string(output)) {
-		pm.logger.Warnf("Power mode %d requires a reboot to take effect. Run 'sudo nvpmodel -m %d' on the device (confirm the reboot prompt), or reboot after running it, to apply it.", pm.config.PowerMode, pm.config.PowerMode)
-		return true, nil
+	// Governor/frequency settings are independent of nvpmodel's power mode
+	// and apply via the same generic cpufreq sysfs interface as the
+	// Raspberry Pi, so continue applying them even when the power mode above
+	// was already current (or requires a reboot to fully take effect).
+	cfg := pm.config
+	if cfg.Governor == "" && cfg.Frequency == 0 && cfg.Minimum == 0 && cfg.Maximum == 0 {
+		return rebootRequired, nil
 	}
+	output, err := cpufrequtils.ApplyPolicy(cfg.Governor, cfg.Frequency, cfg.Minimum, cfg.Maximum)
 	if err != nil {
-		return false, fmt.Errorf("failed to set power mode: %v, output: %s", err, string(output))
+		pm.logger.Errorf("Error configuring CPU: %s: %s", err, output)
+		return rebootRequired, err
 	}
-	// nvpmodel applied the mode immediately; no reboot needed.
-	return false, nil
+	pm.logger.Infof("CPU configured: %s", output)
+	return rebootRequired, nil
 }
 
 // isRebootRequiredOutput reports whether nvpmodel declined the mode change

@@ -12,9 +12,15 @@ const osReleasePath = "/etc/os-release"
 // parseOSRelease reads /etc/os-release into a key/value map. It returns an empty
 // map when the file is missing or unreadable (e.g. on non-Linux hosts).
 func parseOSRelease() map[string]string {
+	return parseOSReleaseFrom(osReleasePath)
+}
+
+// parseOSReleaseFrom does the work of parseOSRelease against an injectable
+// path, so tests can point it at a fake os-release file.
+func parseOSReleaseFrom(path string) map[string]string {
 	result := make(map[string]string)
 
-	f, err := os.Open(osReleasePath)
+	f, err := os.Open(path)
 	if err != nil {
 		return result
 	}
@@ -38,10 +44,18 @@ func parseOSRelease() map[string]string {
 // IsDebianTrixieOrNewer reports whether the host is running Debian 13 ("trixie")
 // or newer, including Raspberry Pi OS / Raspbian derivatives. The legacy
 // cpufrequtils package was removed in Trixie, so callers should install
-// linux-cpupower (the maintained replacement) instead.
+// linux-cpupower (the maintained replacement) instead. Non-Debian-family
+// distros (including Ubuntu, e.g. Jetson/L4T) always report false here:
+// cpufrequtils remains the right choice for them too, since their
+// kernel-version-pinned cpupower packages generally aren't installable for a
+// vendor kernel build (confirmed on a Jetson AGX Orin running Ubuntu 24.04).
 func IsDebianTrixieOrNewer() bool {
-	osRelease := parseOSRelease()
+	return isDebianTrixieOrNewer(parseOSRelease())
+}
 
+// isDebianTrixieOrNewer does the work of IsDebianTrixieOrNewer against an
+// already-parsed os-release map, so tests can exercise it directly.
+func isDebianTrixieOrNewer(osRelease map[string]string) bool {
 	id := strings.ToLower(osRelease["ID"])
 	idLike := strings.ToLower(osRelease["ID_LIKE"])
 	if id != "debian" && id != "raspbian" && !strings.Contains(idLike, "debian") {

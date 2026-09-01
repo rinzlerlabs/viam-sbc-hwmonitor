@@ -87,19 +87,19 @@ func (c *Config) Readings(ctx context.Context, extra map[string]any) (map[string
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	minFreq, err := cpufrequtils.GetHardwareMinimumFrequency()
+	minFreq, err := cpufrequtils.GetHardwareMinimumFrequency(ctx)
 	if err != nil {
 		return nil, err
 	}
-	maxFreq, err := cpufrequtils.GetHardwareMaximumFrequency()
+	maxFreq, err := cpufrequtils.GetHardwareMaximumFrequency(ctx)
 	if err != nil {
 		return nil, err
 	}
-	currentFreq, err := cpufrequtils.GetCurrentFrequency()
+	currentFreq, err := cpufrequtils.GetCurrentFrequency(ctx)
 	if err != nil {
 		return nil, err
 	}
-	governor, err := cpufrequtils.GetGovernor()
+	governor, err := cpufrequtils.GetGovernor(ctx)
 	if err != nil {
 		return nil, err
 	}

@@ -123,7 +123,7 @@ func getJetsonGpuSensors() ([]jetsonGpuSensor, error) {
 		}
 	}
 	if len(found) == 0 {
-		return nil, errors.New("no GPU sensors found")
+		return nil, fmt.Errorf("no GPU sensors found: %w", utils.ErrBoardNotSupported)
 	}
 	return found, nil
 }

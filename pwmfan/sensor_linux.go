@@ -11,12 +11,12 @@ import (
 	"github.com/rinzlerlabs/viam-sbc-hwmonitor/internal/sensors"
 )
 
-func GetTemperatureFunc() (func(ctx context.Context) (*sensors.SystemTemperatures, error), error) {
+func GetTemperatureFunc(ctx context.Context) (func(ctx context.Context) (*sensors.SystemTemperatures, error), error) {
 	if sbcidentify.IsBoardType(boardtype.RaspberryPi) {
 		return raspberrypi.GetTemperatures, nil
-	} else if sbcidentify.IsBoardType(boardtype.Jetson) {
-		return jetson.GetTemperatures, nil
+	} else if jetson.IsJetson() {
+		return jetson.GetTemperatureFunc(ctx)
 	} else {
-		return linux.GetTemperatures, nil
+		return linux.GetTemperatureFunc(ctx)
 	}
 }

@@ -9,6 +9,7 @@ import (
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
 
+	"github.com/rinzlerlabs/viam-sbc-hwmonitor/internal/sensors"
 	"github.com/rinzlerlabs/viam-sbc-hwmonitor/utils"
 )
 
@@ -22,11 +23,12 @@ var (
 
 type Config struct {
 	resource.Named
-	mu         sync.RWMutex
-	logger     logging.Logger
-	cancelCtx  context.Context
-	cancelFunc func()
-	gpuMonitor gpuMonitor
+	mu             sync.RWMutex
+	logger         logging.Logger
+	cancelCtx      context.Context
+	cancelFunc     func()
+	gpuMonitor     gpuMonitor
+	unsupportedErr error
 }
 
 func init() {
@@ -75,15 +77,22 @@ func (c *Config) Reconfigure(ctx context.Context, _ resource.Dependencies, conf 
 	c.Named = conf.ResourceName().AsNamed()
 	c.gpuMonitor, err = newGpuMonitor(c.logger)
 	if err != nil {
-		// On boards without a supported GPU (e.g. Raspberry Pi), don't fail the
-		// resource build; come up and report the condition in Readings instead.
-		if errors.Is(err, ErrUnsupportedBoard) {
+		// On boards without a supported GPU (e.g. Raspberry Pi), or a detected
+		// Jetson whose sysfs GPU nodes don't match any known JetPack layout,
+		// don't fail the resource build; come up and report the condition in
+		// Readings instead. Matching against the shared utils.ErrBoardNotSupported
+		// sentinel (rather than just this package's own ErrUnsupportedBoard)
+		// catches both cases, since the Jetson GPU monitor wraps the same
+		// sentinel for its own "no GPU sensors found" error.
+		if errors.Is(err, utils.ErrBoardNotSupported) {
 			c.logger.Warnf("%s: %v", PrettyName, err)
 			c.gpuMonitor = nil
+			c.unsupportedErr = err
 			return nil
 		}
 		return err
 	}
+	c.unsupportedErr = nil
 	c.logger.Debugf("reconfigure complete %s", PrettyName)
 	return nil
 }
@@ -93,9 +102,11 @@ func (c *Config) Readings(ctx context.Context, extra map[string]any) (map[string
 	defer c.mu.RUnlock()
 	m := make(map[string]any)
 	if c.gpuMonitor == nil {
-		return map[string]any{
-			"error": ErrUnsupportedBoard.Error(),
-		}, nil
+		msg := ErrUnsupportedBoard.Error()
+		if c.unsupportedErr != nil {
+			msg = c.unsupportedErr.Error()
+		}
+		return sensors.DegradedReadings(msg), nil
 	}
 	sample, err := c.gpuMonitor.GetGPUStats(ctx)
 	if err != nil {

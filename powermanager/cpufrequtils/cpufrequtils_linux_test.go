@@ -1,6 +1,7 @@
 package cpufrequtils
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -34,41 +35,53 @@ func fakeOrinCPUFreq(t *testing.T) string {
 }
 
 func TestReadCPUFreqAgainstRealOrinValues(t *testing.T) {
+	ctx := context.Background()
 	root := fakeOrinCPUFreq(t)
 
-	governors, err := readCPUFreqString(root, "scaling_available_governors")
+	governors, err := readCPUFreqString(ctx, root, "scaling_available_governors")
 	require.NoError(t, err)
 	require.Equal(t, "ondemand userspace performance schedutil", governors)
 
-	governor, err := readCPUFreqString(root, "scaling_governor")
+	governor, err := readCPUFreqString(ctx, root, "scaling_governor")
 	require.NoError(t, err)
 	require.Equal(t, "schedutil", governor)
 
-	policyMin, err := readCPUFreqInt(root, "scaling_min_freq")
+	policyMin, err := readCPUFreqInt(ctx, root, "scaling_min_freq")
 	require.NoError(t, err)
 	require.Equal(t, 729600, policyMin)
 
-	policyMax, err := readCPUFreqInt(root, "scaling_max_freq")
+	policyMax, err := readCPUFreqInt(ctx, root, "scaling_max_freq")
 	require.NoError(t, err)
 	require.Equal(t, 2201600, policyMax)
 
-	current, err := readCPUFreqInt(root, "scaling_cur_freq")
+	current, err := readCPUFreqInt(ctx, root, "scaling_cur_freq")
 	require.NoError(t, err)
 	require.Equal(t, 2201600, current)
 
-	hwMin, err := readCPUFreqInt(root, "cpuinfo_min_freq")
+	hwMin, err := readCPUFreqInt(ctx, root, "cpuinfo_min_freq")
 	require.NoError(t, err)
 	require.Equal(t, 115200, hwMin)
 
-	hwMax, err := readCPUFreqInt(root, "cpuinfo_max_freq")
+	hwMax, err := readCPUFreqInt(ctx, root, "cpuinfo_max_freq")
 	require.NoError(t, err)
 	require.Equal(t, 2201600, hwMax)
 }
 
 func TestReadCPUFreqStringMissingFile(t *testing.T) {
 	root := t.TempDir()
-	_, err := readCPUFreqString(root, "scaling_governor")
+	_, err := readCPUFreqString(context.Background(), root, "scaling_governor")
 	require.Error(t, err)
+}
+
+// TestReadCPUFreqStringRespectsCancellation locks in that the shared
+// context-aware utils.ReadFileWithContext helper is actually wired through:
+// a canceled context should abort the read.
+func TestReadCPUFreqStringRespectsCancellation(t *testing.T) {
+	root := fakeOrinCPUFreq(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err := readCPUFreqString(ctx, root, "scaling_governor")
+	require.ErrorIs(t, err, context.Canceled)
 }
 
 // TestBuildCpupowerArgsForJetsonGovernorAndLimits locks in the CLI arguments

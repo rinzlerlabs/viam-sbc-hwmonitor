@@ -97,11 +97,9 @@ func (c *Config) Readings(ctx context.Context, extra map[string]any) (map[string
 		}
 	}
 
-	// An empty map serializes to nil over gRPC, which the sensor service
-	// rejects ("Readings should not return nil readings").
 	if len(readings) == 0 {
 		c.logger.Warn("no clock readings available")
-		readings["error"] = "no clock readings available"
+		return sensors.DegradedReadings("no clock readings available"), nil
 	}
 
 	return readings, nil

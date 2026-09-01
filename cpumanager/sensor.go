@@ -12,6 +12,7 @@ import (
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
 
+	"github.com/rinzlerlabs/viam-sbc-hwmonitor/internal/sensors"
 	"github.com/rinzlerlabs/viam-sbc-hwmonitor/powermanager"
 	"github.com/rinzlerlabs/viam-sbc-hwmonitor/powermanager/cpufrequtils"
 	"github.com/rinzlerlabs/viam-sbc-hwmonitor/utils"
@@ -115,23 +116,21 @@ func (c *Config) Readings(ctx context.Context, extra map[string]any) (map[string
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	if c.unsupported {
-		return map[string]any{
-			"error": "cpu_manager is only supported on Raspberry Pi",
-		}, nil
+		return sensors.DegradedReadings("cpu_manager is only supported on Raspberry Pi"), nil
 	}
-	min, err := cpufrequtils.GetPolicyMinimumFrequency()
+	min, err := cpufrequtils.GetPolicyMinimumFrequency(ctx)
 	if err != nil {
 		return nil, err
 	}
-	max, err := cpufrequtils.GetPolicyMaximumFrequency()
+	max, err := cpufrequtils.GetPolicyMaximumFrequency(ctx)
 	if err != nil {
 		return nil, err
 	}
-	governor, err := cpufrequtils.GetGovernor()
+	governor, err := cpufrequtils.GetGovernor(ctx)
 	if err != nil {
 		return nil, err
 	}
-	currentFrequency, err := cpufrequtils.GetCurrentFrequency()
+	currentFrequency, err := cpufrequtils.GetCurrentFrequency(ctx)
 	if err != nil {
 		return nil, err
 	}

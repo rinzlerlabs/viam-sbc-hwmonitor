@@ -108,7 +108,7 @@ func (c *Config) Reconfigure(ctx context.Context, deps resource.Dependencies, co
 
 	c.temps = temps
 	c.temperatureTable = tempTable
-	tempFunc, err := GetTemperatureFunc()
+	tempFunc, err := GetTemperatureFunc(ctx)
 	if err != nil {
 		return err
 	}

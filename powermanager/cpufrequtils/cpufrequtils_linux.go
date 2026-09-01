@@ -1,8 +1,8 @@
 package cpufrequtils
 
 import (
+	"context"
 	"fmt"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
@@ -50,20 +50,16 @@ func Install() error {
 	return nil
 }
 
-func readCPUFreqString(basePath, name string) (string, error) {
-	data, err := os.ReadFile(filepath.Join(basePath, name))
-	if err != nil {
-		return "", err
-	}
-	return strings.TrimSpace(string(data)), nil
+func readCPUFreqString(ctx context.Context, basePath, name string) (string, error) {
+	return utils.ReadFileWithContext(ctx, filepath.Join(basePath, name))
 }
 
-func readCPUFreqInt(basePath, name string) (int, error) {
-	value, err := readCPUFreqString(basePath, name)
+func readCPUFreqInt(ctx context.Context, basePath, name string) (int, error) {
+	value, err := utils.ReadInt64FromFileWithContext(ctx, filepath.Join(basePath, name))
 	if err != nil {
 		return 0, err
 	}
-	return strconv.Atoi(value)
+	return int(value), nil
 }
 
 // buildCpupowerArgs and buildCpufreqSetArgs translate a governor/frequency
@@ -135,39 +131,39 @@ func SetFrequencyLimits(minimum int, maximum int) error {
 	return err
 }
 
-func GetAvailableGovernors() ([]string, error) {
-	governors, err := readCPUFreqString(cpufreqBasePath, "scaling_available_governors")
+func GetAvailableGovernors(ctx context.Context) ([]string, error) {
+	governors, err := readCPUFreqString(ctx, cpufreqBasePath, "scaling_available_governors")
 	if err != nil {
 		return nil, err
 	}
 	return strings.Fields(governors), nil
 }
 
-func GetGovernor() (string, error) {
-	return readCPUFreqString(cpufreqBasePath, "scaling_governor")
+func GetGovernor(ctx context.Context) (string, error) {
+	return readCPUFreqString(ctx, cpufreqBasePath, "scaling_governor")
 }
 
 // GetHardwareMinimumFrequency and GetHardwareMaximumFrequency report the
 // frequency range the CPU is capable of, regardless of the current policy.
-func GetHardwareMinimumFrequency() (int, error) {
-	return readCPUFreqInt(cpufreqBasePath, "cpuinfo_min_freq")
+func GetHardwareMinimumFrequency(ctx context.Context) (int, error) {
+	return readCPUFreqInt(ctx, cpufreqBasePath, "cpuinfo_min_freq")
 }
 
-func GetHardwareMaximumFrequency() (int, error) {
-	return readCPUFreqInt(cpufreqBasePath, "cpuinfo_max_freq")
+func GetHardwareMaximumFrequency(ctx context.Context) (int, error) {
+	return readCPUFreqInt(ctx, cpufreqBasePath, "cpuinfo_max_freq")
 }
 
 // GetPolicyMinimumFrequency and GetPolicyMaximumFrequency report the bounds
 // of the currently applied scaling policy, which may be narrower than the
 // hardware range.
-func GetPolicyMinimumFrequency() (int, error) {
-	return readCPUFreqInt(cpufreqBasePath, "scaling_min_freq")
+func GetPolicyMinimumFrequency(ctx context.Context) (int, error) {
+	return readCPUFreqInt(ctx, cpufreqBasePath, "scaling_min_freq")
 }
 
-func GetPolicyMaximumFrequency() (int, error) {
-	return readCPUFreqInt(cpufreqBasePath, "scaling_max_freq")
+func GetPolicyMaximumFrequency(ctx context.Context) (int, error) {
+	return readCPUFreqInt(ctx, cpufreqBasePath, "scaling_max_freq")
 }
 
-func GetCurrentFrequency() (Frequency int, Err error) {
-	return readCPUFreqInt(cpufreqBasePath, "scaling_cur_freq")
+func GetCurrentFrequency(ctx context.Context) (int, error) {
+	return readCPUFreqInt(ctx, cpufreqBasePath, "scaling_cur_freq")
 }

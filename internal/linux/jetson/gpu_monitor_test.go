@@ -32,6 +32,24 @@ func TestJetsonGpuGetsFrequencies(t *testing.T) {
 	}
 }
 
+// TestGetJetsonGpuSensorsWrapsErrBoardNotSupportedWhenNoneFound regression-
+// tests the gpumonitor graceful-degradation fix: a detected Jetson whose
+// sysfs GPU nodes don't match any candidate (untested board revision, sysfs
+// not mounted, etc.) must produce an error that unwraps to
+// utils.ErrBoardNotSupported, so gpumonitor/sensor.go's Reconfigure can
+// degrade instead of hard-failing resource construction.
+func TestGetJetsonGpuSensorsWrapsErrBoardNotSupportedWhenNoneFound(t *testing.T) {
+	original := candidateGpuSensors
+	t.Cleanup(func() { candidateGpuSensors = original })
+	candidateGpuSensors = []jetsonGpuSensor{
+		{sensorType: sensors.GPUReadingTypeClocksGraphics, currentValuePath: "/does/not/exist/on/any/board"},
+	}
+
+	_, err := getJetsonGpuSensors()
+	require.Error(t, err)
+	require.ErrorIs(t, err, utils.ErrBoardNotSupported)
+}
+
 func TestJetsonGPUReadingTypeMemoryFree(t *testing.T) {
 	var sensor jetsonGpuSensor
 	for _, sensor = range candidateGpuSensors {

@@ -97,3 +97,48 @@ func TestReadSysfsThermalZones_NoZonesReturnsEmptyNonNilExtra(t *testing.T) {
 	require.NotNil(t, temps.Extra)
 	require.Empty(t, temps.Extra)
 }
+
+// TestThermalZoneReader_DoesNotReReadTypeOnRepeatedReads regression-tests the
+// polling efficiency fix: discovery (glob + reading each zone's static
+// "type" file) happens once in newThermalZoneReader, and Read only re-reads
+// the dynamic "temp" file afterward. Proven here by deleting "type" after
+// construction — a second Read must still succeed and still report the right
+// zone name, because it never touches "type" again.
+func TestThermalZoneReader_DoesNotReReadTypeOnRepeatedReads(t *testing.T) {
+	root := t.TempDir()
+	writeThermalZone(t, root, "thermal_zone0", "cpu-thermal", "40000")
+	ctx := context.Background()
+
+	reader, err := newThermalZoneReader(ctx, root)
+	require.NoError(t, err)
+
+	first, err := reader.Read(ctx)
+	require.NoError(t, err)
+	require.Equal(t, 40.0, *first.CPU)
+
+	require.NoError(t, os.Remove(filepath.Join(root, "thermal_zone0", "type")))
+	require.NoError(t, os.WriteFile(filepath.Join(root, "thermal_zone0", "temp"), []byte("60000\n"), 0644))
+
+	second, err := reader.Read(ctx)
+	require.NoError(t, err, "Read must not re-read the now-deleted type file")
+	require.Equal(t, 60.0, *second.CPU, "the updated temp value should still be picked up")
+	require.Equal(t, 60.0, second.Extra["CPU"], "zone name from initial discovery should be reused")
+}
+
+// TestThermalZoneReader_DiscoveryIsOncePerConstruction covers the case a
+// zone appearing after construction (e.g. hotplugged) is not picked up by an
+// existing reader — confirming discovery genuinely only happens once, not
+// implicitly re-triggered by Read.
+func TestThermalZoneReader_DiscoveryIsOncePerConstruction(t *testing.T) {
+	root := t.TempDir()
+	ctx := context.Background()
+
+	reader, err := newThermalZoneReader(ctx, root)
+	require.NoError(t, err)
+
+	writeThermalZone(t, root, "thermal_zone0", "cpu-thermal", "50000")
+
+	temps, err := reader.Read(ctx)
+	require.NoError(t, err)
+	require.Nil(t, temps.CPU, "zone added after construction should not appear until a new reader is created")
+}

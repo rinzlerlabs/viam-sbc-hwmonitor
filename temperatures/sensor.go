@@ -62,7 +62,7 @@ func (c *Config) Reconfigure(ctx context.Context, _ resource.Dependencies, conf 
 	// In case the module has changed name
 	c.Named = conf.ResourceName().AsNamed()
 
-	temperatureFunc, err := GetTemperatureFunc()
+	temperatureFunc, err := GetTemperatureFunc(ctx)
 	if err != nil {
 		return err
 	}
@@ -92,12 +92,9 @@ func (c *Config) Readings(ctx context.Context, extra map[string]any) (map[string
 		res[key] = value
 	}
 
-	// An empty map serializes to nil over gRPC, which the sensor service
-	// rejects ("Readings should not return nil readings"). Surface the
-	// condition in the logs and readings instead of returning empty.
 	if len(res) == 0 {
 		c.logger.Warn("no temperature readings available")
-		res["error"] = "no temperature readings available"
+		return sensors.DegradedReadings("no temperature readings available"), nil
 	}
 
 	return res, nil

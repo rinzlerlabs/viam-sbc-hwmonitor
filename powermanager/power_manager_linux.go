@@ -2,12 +2,11 @@ package powermanager
 
 import (
 	"errors"
-	"strings"
 
 	"github.com/rinzlerlabs/sbcidentify"
 	"github.com/rinzlerlabs/viam-sbc-hwmonitor/internal/linux/jetson"
 	"github.com/rinzlerlabs/viam-sbc-hwmonitor/internal/linux/raspberrypi"
-	"github.com/rinzlerlabs/viam-sbc-hwmonitor/utils"
+	"github.com/rinzlerlabs/viam-sbc-hwmonitor/powermanager/cpufrequtils"
 	"go.viam.com/rdk/logging"
 )
 
@@ -17,15 +16,8 @@ var (
 )
 
 func newPowerManager(config *ComponentConfig, logger logging.Logger) (PowerManager, error) {
-	// cpufrequtils was removed in Debian Trixie; install its maintained
-	// replacement (linux-cpupower, plus its libcpupower1 runtime library) there
-	// and keep cpufrequtils on older systems.
-	cpuFreqPackages := []string{"cpufrequtils"}
-	if utils.IsDebianTrixieOrNewer() {
-		cpuFreqPackages = []string{"linux-cpupower", "libcpupower1"}
-	}
-	if err := utils.InstallPackage(cpuFreqPackages...); err != nil {
-		return nil, errors.Join(err, errors.New("error installing "+strings.Join(cpuFreqPackages, ", ")))
+	if err := cpufrequtils.Install(); err != nil {
+		return nil, err
 	}
 
 	// Detect a Tegra GPU directly in addition to board identification, since

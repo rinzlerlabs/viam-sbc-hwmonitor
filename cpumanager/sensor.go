@@ -86,15 +86,8 @@ func (c *Config) Reconfigure(ctx context.Context, _ resource.Dependencies, conf 
 		return nil
 	}
 
-	// cpufrequtils was removed in Debian Trixie; install its maintained
-	// replacement (linux-cpupower, plus its libcpupower1 runtime library) there
-	// and keep cpufrequtils on older systems.
-	cpuFreqPackages := []string{"cpufrequtils"}
-	if utils.IsDebianTrixieOrNewer() {
-		cpuFreqPackages = []string{"linux-cpupower", "libcpupower1"}
-	}
-	if err = utils.InstallPackage(cpuFreqPackages...); err != nil {
-		c.logger.Errorf("Error installing %v: %s", cpuFreqPackages, err)
+	if err = cpufrequtils.Install(); err != nil {
+		c.logger.Errorf("Error installing CPU frequency tooling: %s", err)
 		return err
 	}
 

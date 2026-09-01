@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strconv"
 
+	"github.com/rinzlerlabs/sbcidentify"
 	"github.com/rinzlerlabs/viam-sbc-hwmonitor/powermanager/cpufrequtils"
 )
 
@@ -19,6 +20,16 @@ type ComponentConfig struct {
 }
 
 func (conf *ComponentConfig) Validate(path string) ([]string, []string, error) {
+	// This component only supports the Raspberry Pi: Reconfigure (sensor.go)
+	// marks itself unsupported and no-ops on any other board. Skip cpufreq
+	// validation here too, so Validate doesn't hard-fail on boards with no
+	// cpufreq driver, or silently pass on boards that happen to expose
+	// generic cpufreq sysfs (e.g. Jetson) only to have the config ignored at
+	// runtime anyway.
+	if !sbcidentify.IsRaspberryPi() {
+		return nil, nil, nil
+	}
+
 	if conf.Governor != "" {
 		availableGovernors, err := cpufrequtils.GetAvailableGovernors()
 		if err != nil {

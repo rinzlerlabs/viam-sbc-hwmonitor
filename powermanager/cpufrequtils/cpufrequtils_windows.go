@@ -1,6 +1,10 @@
 package cpufrequtils
 
-import "github.com/rinzlerlabs/viam-sbc-hwmonitor/utils"
+import (
+	"context"
+
+	"github.com/rinzlerlabs/viam-sbc-hwmonitor/utils"
+)
 
 func Install() error {
 	return utils.ErrPlatformNotSupported
@@ -21,30 +25,30 @@ func SetFrequencyLimits(minimum int, maximum int) error {
 	return utils.ErrPlatformNotSupported
 }
 
-func GetAvailableGovernors() ([]string, error) {
+func GetAvailableGovernors(ctx context.Context) ([]string, error) {
 	return nil, utils.ErrPlatformNotSupported
 }
 
-func GetGovernor() (string, error) {
+func GetGovernor(ctx context.Context) (string, error) {
 	return "", utils.ErrPlatformNotSupported
 }
 
-func GetHardwareMinimumFrequency() (int, error) {
+func GetHardwareMinimumFrequency(ctx context.Context) (int, error) {
 	return -1, utils.ErrPlatformNotSupported
 }
 
-func GetHardwareMaximumFrequency() (int, error) {
+func GetHardwareMaximumFrequency(ctx context.Context) (int, error) {
 	return -1, utils.ErrPlatformNotSupported
 }
 
-func GetPolicyMinimumFrequency() (int, error) {
+func GetPolicyMinimumFrequency(ctx context.Context) (int, error) {
 	return -1, utils.ErrPlatformNotSupported
 }
 
-func GetPolicyMaximumFrequency() (int, error) {
+func GetPolicyMaximumFrequency(ctx context.Context) (int, error) {
 	return -1, utils.ErrPlatformNotSupported
 }
 
-func GetCurrentFrequency() (Frequency int, Err error) {
+func GetCurrentFrequency(ctx context.Context) (int, error) {
 	return -1, utils.ErrPlatformNotSupported
 }

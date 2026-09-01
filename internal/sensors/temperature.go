@@ -16,37 +16,63 @@ import (
 // etc.).
 const thermalClassPath = "/sys/class/thermal"
 
-// ReadSysfsThermalZones discovers and reads all kernel thermal zones, mapping
-// each to CPU/GPU/Extra based on its reported type (ex: "cpu-thermal" -> CPU).
-// Zones that cannot be read are skipped. The returned map may be empty if no
-// zones are readable.
-func ReadSysfsThermalZones(ctx context.Context) (*SystemTemperatures, error) {
-	return readSysfsThermalZones(ctx, thermalClassPath)
+// ThermalZoneReader polls kernel thermal zones repeatedly without re-globbing
+// sysfs or re-reading each zone's static "type" file on every call — that
+// discovery happens once, in NewThermalZoneReader. Use this instead of
+// ReadSysfsThermalZones for anything that polls on a fixed interval (e.g.
+// pwm_fan's control loop); ReadSysfsThermalZones redoes the discovery work on
+// every single call, which is wasted I/O for data that never changes at
+// runtime.
+type ThermalZoneReader struct {
+	zones []thermalZoneSource
 }
 
-// readSysfsThermalZones does the work for ReadSysfsThermalZones against an
+type thermalZoneSource struct {
+	name     string // cleaned zone type, ex: "CPU0"
+	tempPath string
+}
+
+// NewThermalZoneReader discovers all kernel thermal zones once, mapping each
+// to its cleaned type name (ex: "cpu-thermal" -> "CPU"). Zones whose type
+// can't be read are skipped.
+func NewThermalZoneReader(ctx context.Context) (*ThermalZoneReader, error) {
+	return newThermalZoneReader(ctx, thermalClassPath)
+}
+
+// newThermalZoneReader does the work for NewThermalZoneReader against an
 // injectable sysfs class directory, so tests can point it at a fake directory
 // tree instead of the real sysfs.
-func readSysfsThermalZones(ctx context.Context, classPath string) (*SystemTemperatures, error) {
-	zones, err := filepath.Glob(filepath.Join(classPath, "thermal_zone*"))
+func newThermalZoneReader(ctx context.Context, classPath string) (*ThermalZoneReader, error) {
+	paths, err := filepath.Glob(filepath.Join(classPath, "thermal_zone*"))
 	if err != nil {
 		return nil, err
 	}
 
-	systemTemps := &SystemTemperatures{Extra: make(map[string]float64)}
-	for _, zone := range zones {
+	zones := make([]thermalZoneSource, 0, len(paths))
+	for _, zone := range paths {
 		name, err := readThermalZoneType(ctx, filepath.Join(zone, "type"))
 		if err != nil {
 			continue
 		}
+		zones = append(zones, thermalZoneSource{name: name, tempPath: filepath.Join(zone, "temp")})
+	}
+	return &ThermalZoneReader{zones: zones}, nil
+}
 
-		temp, err := NewFileTemperatureSensor(name, filepath.Join(zone, "temp")).Read(ctx)
+// Read polls the current temperature of every zone discovered at
+// construction time, mapping each to CPU/GPU/Extra based on its type (ex:
+// "CPU" -> CPU). Zones that fail to read are skipped. The returned map may be
+// empty if no zones are readable.
+func (r *ThermalZoneReader) Read(ctx context.Context) (*SystemTemperatures, error) {
+	systemTemps := &SystemTemperatures{Extra: make(map[string]float64)}
+	for _, zone := range r.zones {
+		temp, err := NewFileTemperatureSensor(zone.name, zone.tempPath).Read(ctx)
 		if err != nil {
 			continue
 		}
 		temp = float64(int((temp/1000)*100)) / 100
 
-		lowerName := strings.ToLower(name)
+		lowerName := strings.ToLower(zone.name)
 		switch {
 		case strings.Contains(lowerName, "cpu"):
 			// A board can expose more than one CPU-type zone (e.g. per-cluster
@@ -58,19 +84,35 @@ func readSysfsThermalZones(ctx context.Context, classPath string) (*SystemTemper
 				cpu := temp
 				systemTemps.CPU = &cpu
 			}
-			systemTemps.Extra[name] = temp
+			systemTemps.Extra[zone.name] = temp
 		case strings.Contains(lowerName, "gpu"):
 			if systemTemps.GPU == nil || temp > *systemTemps.GPU {
 				gpu := temp
 				systemTemps.GPU = &gpu
 			}
-			systemTemps.Extra[name] = temp
+			systemTemps.Extra[zone.name] = temp
 		default:
-			systemTemps.Extra[name] = temp
+			systemTemps.Extra[zone.name] = temp
 		}
 	}
-
 	return systemTemps, nil
+}
+
+// ReadSysfsThermalZones discovers and reads all kernel thermal zones in a
+// single call. Prefer ThermalZoneReader for anything that polls repeatedly.
+func ReadSysfsThermalZones(ctx context.Context) (*SystemTemperatures, error) {
+	return readSysfsThermalZones(ctx, thermalClassPath)
+}
+
+// readSysfsThermalZones does the work for ReadSysfsThermalZones against an
+// injectable sysfs class directory, so tests can point it at a fake directory
+// tree instead of the real sysfs.
+func readSysfsThermalZones(ctx context.Context, classPath string) (*SystemTemperatures, error) {
+	r, err := newThermalZoneReader(ctx, classPath)
+	if err != nil {
+		return nil, err
+	}
+	return r.Read(ctx)
 }
 
 // readThermalZoneType returns the cleaned type name of a thermal zone, ex: a

@@ -2,18 +2,19 @@ package gpumonitor
 
 import (
 	"context"
-	"errors"
+	"fmt"
 
-	"github.com/rinzlerlabs/sbcidentify"
-	"github.com/rinzlerlabs/sbcidentify/boardtype"
 	"github.com/rinzlerlabs/viam-sbc-hwmonitor/internal/linux/jetson"
 	"github.com/rinzlerlabs/viam-sbc-hwmonitor/internal/sensors"
+	"github.com/rinzlerlabs/viam-sbc-hwmonitor/utils"
 	"go.viam.com/rdk/logging"
 )
 
-var (
-	ErrUnsupportedBoard = errors.New("gpu stats not supported on this board")
-)
+// ErrUnsupportedBoard wraps the shared utils.ErrBoardNotSupported sentinel so
+// callers can match either this GPU-specific message or any other unsupported-
+// board error (e.g. the Jetson GPU monitor's own "no GPU sensors found") via a
+// single errors.Is(err, utils.ErrBoardNotSupported) check.
+var ErrUnsupportedBoard = fmt.Errorf("gpu stats not supported on this board: %w", utils.ErrBoardNotSupported)
 
 type gpuMonitor interface {
 	// Close closes the GPU monitor.
@@ -29,10 +30,9 @@ type gpuMonitor interface {
 }
 
 func newGpuMonitor(logger logging.Logger) (gpuMonitor, error) {
-	// Prefer the Jetson sysfs monitor for Tegra integrated GPUs. Check for the
-	// GPU sysfs node directly (not just board identification), since detection
-	// can fail on some Jetsons (e.g. Orin) and nvidia-smi does not work on Tegra.
-	if sbcidentify.IsBoardType(boardtype.NVIDIA) || jetson.HasJetsonGpu() {
+	// Prefer the Jetson sysfs monitor for Tegra integrated GPUs; nvidia-smi
+	// does not work on Tegra.
+	if jetson.IsJetson() {
 		return jetson.NewJetsonGpuMonitor(logger)
 	} else if sensors.HasNvidiaSmiCommand(logger) {
 		return sensors.NewNVIDIAGpuMonitor(logger)

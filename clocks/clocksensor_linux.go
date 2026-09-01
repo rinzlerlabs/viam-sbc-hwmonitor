@@ -14,7 +14,7 @@ import (
 func getClockSensors(ctx context.Context, logger logging.Logger) ([]sensors.ClockSensor, error) {
 	if sbcidentify.IsRaspberryPi() {
 		return raspberrypi.GetClockSensors(ctx, logger)
-	} else if sbcidentify.IsNvidia() {
+	} else if jetson.IsJetson() {
 		return jetson.GetClockSensors(ctx, logger)
 	}
 	boardtype, err := sbcidentify.GetBoardType()

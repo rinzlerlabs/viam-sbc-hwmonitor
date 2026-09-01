@@ -20,9 +20,7 @@ func newPowerManager(config *ComponentConfig, logger logging.Logger) (PowerManag
 		return nil, err
 	}
 
-	// Detect a Tegra GPU directly in addition to board identification, since
-	// sbcidentify can fail to identify some Jetsons (e.g. Orin).
-	if sbcidentify.IsJetson() || jetson.HasJetsonGpu() {
+	if jetson.IsJetson() {
 		if config.Jetson == nil {
 			return nil, ErrNoConfigForBoard
 		}

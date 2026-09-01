@@ -4,6 +4,7 @@
 package cpumanager
 
 import (
+	"context"
 	"errors"
 	"slices"
 	"strconv"
@@ -30,8 +31,13 @@ func (conf *ComponentConfig) Validate(path string) ([]string, []string, error) {
 		return nil, nil, nil
 	}
 
+	// Validate's signature (fixed by the resource.Validator interface) carries
+	// no context, so there's no caller-provided deadline/cancellation to
+	// propagate here — background is the honest choice, not a shortcut.
+	ctx := context.Background()
+
 	if conf.Governor != "" {
-		availableGovernors, err := cpufrequtils.GetAvailableGovernors()
+		availableGovernors, err := cpufrequtils.GetAvailableGovernors(ctx)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -41,11 +47,11 @@ func (conf *ComponentConfig) Validate(path string) ([]string, []string, error) {
 	}
 
 	if conf.Frequency != 0 {
-		min, err := cpufrequtils.GetHardwareMinimumFrequency()
+		min, err := cpufrequtils.GetHardwareMinimumFrequency(ctx)
 		if err != nil {
 			return nil, nil, err
 		}
-		max, err := cpufrequtils.GetHardwareMaximumFrequency()
+		max, err := cpufrequtils.GetHardwareMaximumFrequency(ctx)
 		if err != nil {
 			return nil, nil, err
 		}

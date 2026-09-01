@@ -2,6 +2,7 @@ package powermanager
 
 import (
 	"errors"
+	"strings"
 
 	"github.com/rinzlerlabs/sbcidentify"
 	"github.com/rinzlerlabs/viam-sbc-hwmonitor/internal/linux/jetson"
@@ -16,12 +17,20 @@ var (
 )
 
 func newPowerManager(config *ComponentConfig, logger logging.Logger) (PowerManager, error) {
-	err := utils.InstallPackage("cpufrequtils")
-	if err != nil {
-		return nil, errors.Join(err, errors.New("error installing cpufrequtils"))
+	// cpufrequtils was removed in Debian Trixie; install its maintained
+	// replacement (linux-cpupower, plus its libcpupower1 runtime library) there
+	// and keep cpufrequtils on older systems.
+	cpuFreqPackages := []string{"cpufrequtils"}
+	if utils.IsDebianTrixieOrNewer() {
+		cpuFreqPackages = []string{"linux-cpupower", "libcpupower1"}
+	}
+	if err := utils.InstallPackage(cpuFreqPackages...); err != nil {
+		return nil, errors.Join(err, errors.New("error installing "+strings.Join(cpuFreqPackages, ", ")))
 	}
 
-	if sbcidentify.IsJetson() {
+	// Detect a Tegra GPU directly in addition to board identification, since
+	// sbcidentify can fail to identify some Jetsons (e.g. Orin).
+	if sbcidentify.IsJetson() || jetson.HasJetsonGpu() {
 		if config.Jetson == nil {
 			return nil, ErrNoConfigForBoard
 		}

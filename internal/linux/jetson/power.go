@@ -64,7 +64,7 @@ func (s *jetsonPowerSensor) GetReadingMap() (map[string]interface{}, error) {
 	ret := make(map[string]interface{})
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	current, voltage, power, err := s.GetReading()
+	voltage, current, power, err := s.GetReading()
 	if err != nil {
 		return nil, err
 	}
@@ -92,11 +92,12 @@ func (s *jetsonPowerSensor) GetReadingMap() (map[string]interface{}, error) {
 	return ret, nil
 }
 
-func newJetsonPowerSensor(ctx context.Context, logger logging.Logger, index int) (*jetsonPowerSensor, error) {
-	name, err := utils.ReadFileWithContext(ctx, fmt.Sprintf("/sys/bus/i2c/drivers/ina3221/1-0040/hwmon/hwmon1/in%v_label", index))
+func newJetsonPowerSensor(ctx context.Context, logger logging.Logger, hwmonDir string, index int) (*jetsonPowerSensor, error) {
+	name, err := utils.ReadFileWithContext(ctx, filepath.Join(hwmonDir, fmt.Sprintf("in%d_label", index)))
 	if err != nil {
 		return nil, err
 	}
+	name = strings.TrimSpace(name)
 	if strings.Contains(name, "sum") {
 		return nil, ErrIgnoredSensor
 	}
@@ -108,35 +109,38 @@ func newJetsonPowerSensor(ctx context.Context, logger logging.Logger, index int)
 		name:                         name,
 		cancelCtx:                    ctx,
 		cancelFunc:                   cancel,
-		overCurrentAlarmFile:         fmt.Sprintf("/sys/bus/i2c/drivers/ina3221/1-0040/hwmon/hwmon1/curr%v_alarm", index),
-		criticalOverCurrentAlarmFile: fmt.Sprintf("/sys/bus/i2c/drivers/ina3221/1-0040/hwmon/hwmon1/curr%v_crit_alarm", index),
-		voltageFile:                  fmt.Sprintf("/sys/bus/i2c/drivers/ina3221/1-0040/hwmon/hwmon1/in%v_input", index),
-		currentFile:                  fmt.Sprintf("/sys/bus/i2c/drivers/ina3221/1-0040/hwmon/hwmon1/curr%v_input", index),
+		overCurrentAlarmFile:         filepath.Join(hwmonDir, fmt.Sprintf("curr%d_alarm", index)),
+		criticalOverCurrentAlarmFile: filepath.Join(hwmonDir, fmt.Sprintf("curr%d_crit_alarm", index)),
+		voltageFile:                  filepath.Join(hwmonDir, fmt.Sprintf("in%d_input", index)),
+		currentFile:                  filepath.Join(hwmonDir, fmt.Sprintf("curr%d_input", index)),
 	}, nil
 }
 
 func GetPowerSensors(ctx context.Context, logger logging.Logger) ([]sensors.PowerSensor, error) {
-	sensors := make([]sensors.PowerSensor, 0)
-	matches, err := filepath.Glob("/sys/bus/i2c/drivers/ina3221/1-0040/hwmon/hwmon*/in*_label")
+	powerSensors := make([]sensors.PowerSensor, 0)
+	// Discover INA3221 power monitors at any I2C address / hwmon index rather
+	// than hardcoding 1-0040/hwmon1, which differs across Jetson boards.
+	matches, err := filepath.Glob("/sys/bus/i2c/drivers/ina3221*/*/hwmon/hwmon*/in*_label")
 	if err != nil {
 		return nil, err
 	}
 	for _, match := range matches {
+		hwmonDir := filepath.Dir(match)
 		base := filepath.Base(match)
 		var index int
-		_, err := fmt.Sscanf(base, "in%d_label", &index)
-		if err != nil {
-			return nil, err
+		if _, err := fmt.Sscanf(base, "in%d_label", &index); err != nil {
+			continue
 		}
-		sensor, err := newJetsonPowerSensor(ctx, logger, index)
-		if err == ErrIgnoredSensor {
-			logger.Debugf("Ignoring sensor %s", index)
+		sensor, err := newJetsonPowerSensor(ctx, logger, hwmonDir, index)
+		if errors.Is(err, ErrIgnoredSensor) {
+			logger.Debugf("Ignoring power sensor in%d_label", index)
 			continue
 		}
 		if err != nil {
-			return nil, err
+			logger.Warnf("failed to create power sensor from %s: %v", match, err)
+			continue
 		}
-		sensors = append(sensors, sensor)
+		powerSensors = append(powerSensors, sensor)
 	}
-	return sensors, nil
+	return powerSensors, nil
 }

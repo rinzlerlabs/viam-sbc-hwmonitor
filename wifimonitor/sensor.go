@@ -77,10 +77,10 @@ func (c *Config) Reconfigure(ctx context.Context, _ resource.Dependencies, conf 
 	return nil
 }
 
-func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
+func (c *Config) Readings(ctx context.Context, extra map[string]any) (map[string]any, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	ret := make(map[string]interface{})
+	ret := make(map[string]any)
 	if c.wifiMonitor != nil {
 		status, err := c.wifiMonitor.GetNetworkStatus()
 		if err == ErrAdapterNotFound {
@@ -108,6 +108,6 @@ func (c *Config) Close(ctx context.Context) error {
 	return nil
 }
 
-func (c *Config) Ready(ctx context.Context, extra map[string]interface{}) (bool, error) {
+func (c *Config) Ready(ctx context.Context, extra map[string]any) (bool, error) {
 	return false, nil
 }

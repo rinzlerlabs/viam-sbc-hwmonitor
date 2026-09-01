@@ -70,7 +70,7 @@ func (c *Config) Reconfigure(ctx context.Context, _ resource.Dependencies, conf 
 	return nil
 }
 
-func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
+func (c *Config) Readings(ctx context.Context, extra map[string]any) (map[string]any, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
@@ -79,7 +79,7 @@ func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (ma
 		return nil, err
 	}
 
-	res := make(map[string]interface{})
+	res := make(map[string]any)
 	if temperatures.CPU != nil {
 		res["CPU"] = *temperatures.CPU
 	}
@@ -108,6 +108,6 @@ func (c *Config) Close(ctx context.Context) error {
 	return nil
 }
 
-func (c *Config) Ready(ctx context.Context, extra map[string]interface{}) (bool, error) {
+func (c *Config) Ready(ctx context.Context, extra map[string]any) (bool, error) {
 	return false, nil
 }

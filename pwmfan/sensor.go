@@ -2,6 +2,7 @@ package pwmfan
 
 import (
 	"context"
+	"errors"
 	"sort"
 	"strconv"
 	"sync"
@@ -22,6 +23,10 @@ var (
 	PrettyName  = "SBC PWM Fan Speed Controller"
 	Description = "A module to control the speed of a PWM fan connected to the SBC based on a temperature table"
 	Version     = utils.Version
+)
+
+var (
+	ErrNilCPUTemperature = errors.New("CPU temperature is nil")
 )
 
 type Config struct {
@@ -113,7 +118,7 @@ func (c *Config) Reconfigure(ctx context.Context, deps resource.Dependencies, co
 	return nil
 }
 
-func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
+func (c *Config) Readings(ctx context.Context, extra map[string]any) (map[string]any, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
@@ -125,7 +130,7 @@ func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (ma
 
 	if temperatures.CPU == nil {
 		c.logger.Errorf("Error getting CPU temperature")
-		return nil, err
+		return nil, ErrNilCPUTemperature
 	}
 	currentTemp := *temperatures.CPU
 
@@ -135,7 +140,7 @@ func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (ma
 		return nil, err
 	}
 
-	return map[string]interface{}{
+	return map[string]any{
 		"temperature":   currentTemp,
 		"fan_speed_pct": fan_speed * 100,
 	}, nil
@@ -150,7 +155,7 @@ func (c *Config) Close(ctx context.Context) error {
 	return nil
 }
 
-func (c *Config) Ready(ctx context.Context, extra map[string]interface{}) (bool, error) {
+func (c *Config) Ready(ctx context.Context, extra map[string]any) (bool, error) {
 	return false, nil
 }
 

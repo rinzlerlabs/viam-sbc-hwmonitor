@@ -118,11 +118,11 @@ func (c *Config) Reconfigure(ctx context.Context, _ resource.Dependencies, conf 
 	return nil
 }
 
-func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
+func (c *Config) Readings(ctx context.Context, extra map[string]any) (map[string]any, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	if c.unsupported {
-		return map[string]interface{}{
+		return map[string]any{
 			"error": "cpu_manager is only supported on Raspberry Pi",
 		}, nil
 	}
@@ -142,7 +142,7 @@ func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (ma
 	if err != nil {
 		return nil, err
 	}
-	return map[string]interface{}{
+	return map[string]any{
 		"current_frequency": currentFrequency,
 		"minimum_frequency": min,
 		"maximum_frequency": max,
@@ -155,6 +155,6 @@ func (c *Config) Close(ctx context.Context) error {
 	return nil
 }
 
-func (c *Config) Ready(ctx context.Context, extra map[string]interface{}) (bool, error) {
+func (c *Config) Ready(ctx context.Context, extra map[string]any) (bool, error) {
 	return false, nil
 }

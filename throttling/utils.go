@@ -25,7 +25,7 @@ const (
 	SoftTempLimitOccurred   = "softTempLimitOccurred"
 )
 
-func getThrottlingStates(ctx context.Context) (map[string]interface{}, error) {
+func getThrottlingStates(ctx context.Context) (map[string]any, error) {
 	if sbcidentify.IsBoardType(boardtype.RaspberryPi) {
 		return getRasPiThrottlingStates(ctx)
 	} else if sbcidentify.IsBoardType(boardtype.NVIDIA) {
@@ -34,7 +34,7 @@ func getThrottlingStates(ctx context.Context) (map[string]interface{}, error) {
 	return nil, fmt.Errorf("board not supported")
 }
 
-func getRasPiThrottlingStates(ctx context.Context) (map[string]interface{}, error) {
+func getRasPiThrottlingStates(ctx context.Context) (map[string]any, error) {
 	proc := exec.CommandContext(ctx, "vcgencmd", "get_throttled")
 	outputBytes, err := proc.Output()
 	if err != nil {
@@ -44,7 +44,7 @@ func getRasPiThrottlingStates(ctx context.Context) (map[string]interface{}, erro
 	return parseRasPiThrottlingStates(output)
 }
 
-func parseRasPiThrottlingStates(output string) (map[string]interface{}, error) {
+func parseRasPiThrottlingStates(output string) (map[string]any, error) {
 	parts := strings.Split(output, "=")
 	if len(parts) != 2 {
 		return nil, fmt.Errorf("unexpected output from vcgencmd %s", output)
@@ -54,7 +54,7 @@ func parseRasPiThrottlingStates(output string) (map[string]interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	return map[string]interface{}{
+	return map[string]any{
 		Undervolt:               throttlingStates&0x1 != 0,
 		ArmFrequencyCapped:      throttlingStates&0x2 != 0,
 		CurrentlyThrottled:      throttlingStates&0x04 != 0,
@@ -66,7 +66,7 @@ func parseRasPiThrottlingStates(output string) (map[string]interface{}, error) {
 	}, nil
 }
 
-func getJetsonThrottlingStates(ctx context.Context) (map[string]interface{}, error) {
+func getJetsonThrottlingStates(ctx context.Context) (map[string]any, error) {
 	ctxWithTimeout, cancel := context.WithTimeout(ctx, 100*time.Millisecond)
 	defer cancel()
 	dirs, err := filepath.Glob("/sys/class/thermal/cooling_device*")
@@ -74,7 +74,7 @@ func getJetsonThrottlingStates(ctx context.Context) (map[string]interface{}, err
 		return nil, err
 	}
 
-	throttlingStates := make(map[string]interface{})
+	throttlingStates := make(map[string]any)
 	for _, dir := range dirs {
 		deviceType, err := utils.ReadFileWithContext(ctxWithTimeout, filepath.Join(dir, "type"))
 		if err != nil {

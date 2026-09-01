@@ -14,7 +14,7 @@ import (
 
 type ClockSensor interface {
 	Close() error
-	GetReadingMap() (map[string]interface{}, error)
+	GetReadingMap() (map[string]any, error)
 	Name() string
 }
 
@@ -101,13 +101,13 @@ func (s *fileClockSensor) Name() string {
 	return s.name
 }
 
-func (s *fileClockSensor) GetReadingMap() (map[string]interface{}, error) {
+func (s *fileClockSensor) GetReadingMap() (map[string]any, error) {
 	frequency, err := GetSysFsClock(s.cancelCtx, s.path)
 	if err != nil {
 		s.logger.Errorw("failed to read sysfs clock", "sensor", s.name, "path", s.path, "error", err)
 		return nil, err
 	}
-	return map[string]interface{}{s.name: frequency}, nil
+	return map[string]any{s.name: frequency}, nil
 }
 
 func GetSysFsClock(ctx context.Context, path string) (int64, error) {

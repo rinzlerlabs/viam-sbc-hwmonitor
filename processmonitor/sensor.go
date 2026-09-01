@@ -30,7 +30,7 @@ type Config struct {
 	readingsLock      sync.RWMutex // to protect the readings map
 	logger            logging.Logger
 	info              *procInfo
-	currentReadings   map[string]interface{}
+	currentReadings   map[string]any
 	workers           *viamutils.StoppableWorkers
 	sleepTime         time.Duration
 	disablePIDCaching bool
@@ -115,13 +115,13 @@ func (c *Config) Reconfigure(ctx context.Context, _ resource.Dependencies, rawCo
 
 	if c.currentReadings == nil {
 		// Initialize the current readings map if it is nil, this shouldn't happen but just in case
-		c.currentReadings = make(map[string]interface{})
+		c.currentReadings = make(map[string]any)
 	}
 
 	return nil
 }
 
-func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
+func (c *Config) Readings(ctx context.Context, extra map[string]any) (map[string]any, error) {
 	c.readingsLock.RLock()
 	defer c.readingsLock.RUnlock()
 	return c.currentReadings, nil
@@ -151,7 +151,7 @@ func (c *Config) startUpdating(ctx context.Context) {
 			if err != nil {
 				// log the error but continue the loop
 				c.logger.Warnf("Failed to get readings: %v", err)
-				c.updateCurrentReadings(make(map[string]interface{}))
+				c.updateCurrentReadings(make(map[string]any))
 				continue
 			}
 			// Update the readings in the sensor
@@ -162,14 +162,14 @@ func (c *Config) startUpdating(ctx context.Context) {
 	}
 }
 
-func (c *Config) updateCurrentReadings(newReadings map[string]interface{}) {
+func (c *Config) updateCurrentReadings(newReadings map[string]any) {
 	c.readingsLock.Lock()
 	defer c.readingsLock.Unlock()
 	c.currentReadings = newReadings
 }
 
-func (c *Config) getCPUStats(ctx context.Context, procMon *sensors.ProcessMonitor) (map[string]interface{}, error) {
-	resp := make(map[string]interface{})
+func (c *Config) getCPUStats(ctx context.Context, procMon *sensors.ProcessMonitor) (map[string]any, error) {
+	resp := make(map[string]any)
 	procs, err := procMon.GetProcessesWithContext(ctx)
 	if err != nil {
 		c.logger.Warnf("Error getting process: %v", err)
@@ -178,7 +178,7 @@ func (c *Config) getCPUStats(ctx context.Context, procMon *sensors.ProcessMonito
 	c.logger.Debugf("Found %d processes for %s", procs.Len(), c.info.Name)
 
 	for _, proc := range procs.AllFromFront() {
-		ret := make(map[string]interface{})
+		ret := make(map[string]any)
 		if c.info.Name != "" {
 			ret["name"] = proc.Name
 		}
@@ -296,6 +296,6 @@ func (c *Config) Close(ctx context.Context) error {
 	return nil
 }
 
-func (c *Config) Ready(ctx context.Context, extra map[string]interface{}) (bool, error) {
+func (c *Config) Ready(ctx context.Context, extra map[string]any) (bool, error) {
 	return false, nil
 }

@@ -89,7 +89,7 @@ func (s *raspberryPiClockSensor) Close() error {
 	return nil
 }
 
-func (s *raspberryPiClockSensor) GetReadingMap() (map[string]interface{}, error) {
+func (s *raspberryPiClockSensor) GetReadingMap() (map[string]any, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	var frequency int64
@@ -102,7 +102,7 @@ func (s *raspberryPiClockSensor) GetReadingMap() (map[string]interface{}, error)
 	default:
 		return nil, errors.New("unknown sensor type")
 	}
-	return map[string]interface{}{
+	return map[string]any{
 		s.name: frequency,
 	}, err
 }

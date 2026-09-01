@@ -126,10 +126,17 @@ func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (ma
 			"error": "cpu_manager is only supported on Raspberry Pi",
 		}, nil
 	}
-	min, max, governor, err := cpufrequtils.GetCurrentPolicy()
+	min, err := cpufrequtils.GetPolicyMinimumFrequency()
 	if err != nil {
 		return nil, err
-
+	}
+	max, err := cpufrequtils.GetPolicyMaximumFrequency()
+	if err != nil {
+		return nil, err
+	}
+	governor, err := cpufrequtils.GetGovernor()
+	if err != nil {
+		return nil, err
 	}
 	currentFrequency, err := cpufrequtils.GetCurrentFrequency()
 	if err != nil {

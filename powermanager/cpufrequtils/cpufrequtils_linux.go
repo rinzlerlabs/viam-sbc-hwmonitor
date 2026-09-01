@@ -95,32 +95,29 @@ func GetAvailableGovernors() ([]string, error) {
 	return strings.Fields(governors), nil
 }
 
-func GetFrequencyLimits() (MinimumFrequency int, MaximumFrequency int, Err error) {
-	min, err := readCPUFreqInt("cpuinfo_min_freq")
-	if err != nil {
-		return 0, 0, err
-	}
-	max, err := readCPUFreqInt("cpuinfo_max_freq")
-	if err != nil {
-		return 0, 0, err
-	}
-	return min, max, nil
+func GetGovernor() (string, error) {
+	return readCPUFreqString("scaling_governor")
 }
 
-func GetCurrentPolicy() (CurrentFrequency int, MaximumFrequency int, Governor string, Err error) {
-	min, err := readCPUFreqInt("scaling_min_freq")
-	if err != nil {
-		return 0, 0, "", err
-	}
-	max, err := readCPUFreqInt("scaling_max_freq")
-	if err != nil {
-		return 0, 0, "", err
-	}
-	governor, err := readCPUFreqString("scaling_governor")
-	if err != nil {
-		return 0, 0, "", err
-	}
-	return min, max, governor, nil
+// GetHardwareMinimumFrequency and GetHardwareMaximumFrequency report the
+// frequency range the CPU is capable of, regardless of the current policy.
+func GetHardwareMinimumFrequency() (int, error) {
+	return readCPUFreqInt("cpuinfo_min_freq")
+}
+
+func GetHardwareMaximumFrequency() (int, error) {
+	return readCPUFreqInt("cpuinfo_max_freq")
+}
+
+// GetPolicyMinimumFrequency and GetPolicyMaximumFrequency report the bounds
+// of the currently applied scaling policy, which may be narrower than the
+// hardware range.
+func GetPolicyMinimumFrequency() (int, error) {
+	return readCPUFreqInt("scaling_min_freq")
+}
+
+func GetPolicyMaximumFrequency() (int, error) {
+	return readCPUFreqInt("scaling_max_freq")
 }
 
 func GetCurrentFrequency() (Frequency int, Err error) {

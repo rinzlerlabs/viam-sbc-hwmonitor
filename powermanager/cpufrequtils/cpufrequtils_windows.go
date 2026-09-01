@@ -21,12 +21,24 @@ func GetAvailableGovernors() ([]string, error) {
 	return nil, utils.ErrPlatformNotSupported
 }
 
-func GetFrequencyLimits() (MinimumFrequency int, MaximumFrequency int, Err error) {
-	return -1, -1, utils.ErrPlatformNotSupported
+func GetGovernor() (string, error) {
+	return "", utils.ErrPlatformNotSupported
 }
 
-func GetCurrentPolicy() (CurrentFrequency int, MaximumFrequency int, Governor string, Err error) {
-	return -1, -1, "", utils.ErrPlatformNotSupported
+func GetHardwareMinimumFrequency() (int, error) {
+	return -1, utils.ErrPlatformNotSupported
+}
+
+func GetHardwareMaximumFrequency() (int, error) {
+	return -1, utils.ErrPlatformNotSupported
+}
+
+func GetPolicyMinimumFrequency() (int, error) {
+	return -1, utils.ErrPlatformNotSupported
+}
+
+func GetPolicyMaximumFrequency() (int, error) {
+	return -1, utils.ErrPlatformNotSupported
 }
 
 func GetCurrentFrequency() (Frequency int, Err error) {

@@ -14,6 +14,8 @@ This is both a sensor and a configuration utility. It lets you manage the CPU fr
 
 All attributes are optional; only the ones you set are applied. Frequency values are in kHz.
 
+> **Note:** Frequency and governor readings/settings are read from and applied to CPU 0 only, and assumed to represent the whole system. On boards with heterogeneous cores (e.g. big.LITTLE performance/efficiency clusters), other cores may run a different governor or frequency range than CPU 0, and this is not currently reported or configured independently.
+
 | Attribute | Type | Required | Description |
 | --- | --- | --- | --- |
 | `governor` | string | No | The CPU governor to set, ex: `performance`, `powersave`, `ondemand`. Validated against the system's available governors. |
@@ -49,6 +51,8 @@ This is a basic memory stats for the SBC.
 ## power_manager
 
 This applies a power profile to the board and reports the current frequency, limits, and governor. Like `cpu_manager`, it automatically installs the CPU frequency tooling (`linux-cpupower` on Debian Trixie and newer, or `cpufrequtils` on older releases). Configuration is board specific: provide the `raspi` object on a Raspberry Pi or the `jetson` object on an NVIDIA Jetson.
+
+> **Note:** As with `cpu_manager`, frequency and governor readings/settings are read from and applied to CPU 0 only, and assumed to represent the whole system. This may not accurately reflect boards with heterogeneous cores.
 
 | Attribute | Type | Required | Description |
 | --- | --- | --- | --- |

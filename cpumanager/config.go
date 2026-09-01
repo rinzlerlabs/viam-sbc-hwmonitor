@@ -30,7 +30,11 @@ func (conf *ComponentConfig) Validate(path string) ([]string, []string, error) {
 	}
 
 	if conf.Frequency != 0 {
-		min, max, err := cpufrequtils.GetFrequencyLimits()
+		min, err := cpufrequtils.GetHardwareMinimumFrequency()
+		if err != nil {
+			return nil, nil, err
+		}
+		max, err := cpufrequtils.GetHardwareMaximumFrequency()
 		if err != nil {
 			return nil, nil, err
 		}

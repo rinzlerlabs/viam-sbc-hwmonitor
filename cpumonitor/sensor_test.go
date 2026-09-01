@@ -21,14 +21,18 @@ func TestCaptureCPUStats(t *testing.T) {
 
 	sensor.workers = viamutils.NewBackgroundStoppableWorkers(sensor.startUpdating)
 
+	var reading map[string]any
 	for {
-		if len(sensor.reading) > 0 {
+		r, err := sensor.Readings(context.Background(), nil)
+		require.NoError(t, err)
+		if len(r) > 0 {
+			reading = r
 			break
 		}
 	}
 	sensor.Close(context.Background())
-	require.Equal(t, runtime.NumCPU()+1, len(sensor.reading))
-	for k, v := range sensor.reading {
+	require.Equal(t, runtime.NumCPU()+1, len(reading))
+	for k, v := range reading {
 		logger.Infof("%v: %v", k, v)
 	}
 }
@@ -58,14 +62,18 @@ func TestCaptureCPUStatsRespectsSleepTime(t *testing.T) {
 	now := time.Now()
 	sensor.workers = viamutils.NewBackgroundStoppableWorkers(sensor.startUpdating)
 
+	var reading map[string]any
 	for {
-		if len(sensor.reading) > 0 {
+		r, err := sensor.Readings(ctx, nil)
+		require.NoError(t, err)
+		if len(r) > 0 {
+			reading = r
 			break
 		}
 	}
 	sensor.Close(ctx)
 	end := time.Now()
-	assert.Equal(t, runtime.NumCPU()+1, len(sensor.reading))
+	assert.Equal(t, runtime.NumCPU()+1, len(reading))
 	testLength := end.Sub(now)
 	logger.Infof("Test took %s", testLength)
 	assert.True(t, testLength > 100*time.Millisecond)

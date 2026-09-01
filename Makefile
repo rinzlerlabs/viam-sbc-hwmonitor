@@ -41,7 +41,7 @@ all: build
 
 test: build
 	@echo "Running tests..."
-	@go test -v ./...
+	@go test -race -cover -coverprofile=coverage.out -v ./...
 
 upload: package
 	@if [ "$(VERSION)" != "$(GIT_VERSION)" ]; then \

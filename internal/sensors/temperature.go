@@ -11,16 +11,24 @@ import (
 	"github.com/rinzlerlabs/viam-sbc-hwmonitor/utils"
 )
 
-// thermalZoneGlob matches the kernel thermal zones exposed by sysfs. These are
-// standard across Linux and present on most SBCs (Jetson, x86, etc.).
-const thermalZoneGlob = "/sys/class/thermal/thermal_zone*"
+// thermalClassPath is the sysfs directory containing kernel thermal zones.
+// These are standard across Linux and present on most SBCs (Jetson, x86,
+// etc.).
+const thermalClassPath = "/sys/class/thermal"
 
 // ReadSysfsThermalZones discovers and reads all kernel thermal zones, mapping
 // each to CPU/GPU/Extra based on its reported type (ex: "cpu-thermal" -> CPU).
 // Zones that cannot be read are skipped. The returned map may be empty if no
 // zones are readable.
 func ReadSysfsThermalZones(ctx context.Context) (*SystemTemperatures, error) {
-	zones, err := filepath.Glob(thermalZoneGlob)
+	return readSysfsThermalZones(ctx, thermalClassPath)
+}
+
+// readSysfsThermalZones does the work for ReadSysfsThermalZones against an
+// injectable sysfs class directory, so tests can point it at a fake directory
+// tree instead of the real sysfs.
+func readSysfsThermalZones(ctx context.Context, classPath string) (*SystemTemperatures, error) {
+	zones, err := filepath.Glob(filepath.Join(classPath, "thermal_zone*"))
 	if err != nil {
 		return nil, err
 	}
@@ -41,11 +49,22 @@ func ReadSysfsThermalZones(ctx context.Context) (*SystemTemperatures, error) {
 		lowerName := strings.ToLower(name)
 		switch {
 		case strings.Contains(lowerName, "cpu"):
-			cpu := temp
-			systemTemps.CPU = &cpu
+			// A board can expose more than one CPU-type zone (e.g. per-cluster
+			// zones on big.LITTLE SoCs: cpu0-thermal, cpu1-thermal). Report the
+			// hottest as the single CPU reading, since that's what matters for
+			// both general reporting and driving fan control, and keep every
+			// zone individually in Extra so none of them are lost.
+			if systemTemps.CPU == nil || temp > *systemTemps.CPU {
+				cpu := temp
+				systemTemps.CPU = &cpu
+			}
+			systemTemps.Extra[name] = temp
 		case strings.Contains(lowerName, "gpu"):
-			gpu := temp
-			systemTemps.GPU = &gpu
+			if systemTemps.GPU == nil || temp > *systemTemps.GPU {
+				gpu := temp
+				systemTemps.GPU = &gpu
+			}
+			systemTemps.Extra[name] = temp
 		default:
 			systemTemps.Extra[name] = temp
 		}

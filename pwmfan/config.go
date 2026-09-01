@@ -45,5 +45,12 @@ func (conf *CloudConfig) Validate(path string) ([]string, []string, error) {
 		}
 	}
 
-	return nil, nil, nil
+	// Declare the board as a required dependency so it is constructed first and
+	// available in deps. If it does not exist, the framework reports a clear
+	// missing-dependency error instead of failing later when building the fan.
+	var deps []string
+	if !conf.UseInternalFan {
+		deps = append(deps, conf.BoardName)
+	}
+	return deps, nil, nil
 }

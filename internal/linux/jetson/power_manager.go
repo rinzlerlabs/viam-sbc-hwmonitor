@@ -48,14 +48,14 @@ func (pm *jetsonPowerManager) ApplyPowerMode() (rebootRequired bool, err error) 
 	// automatically. A reboot-required change is reported back to the caller.
 	cmd.Stdin = strings.NewReader("no\n")
 	output, err := cmd.CombinedOutput()
+	// nvpmodel's exit code for a declined reboot prompt isn't documented and
+	// isn't consistent to rely on, so check the output text regardless of
+	// whether the command itself exited zero or non-zero.
+	if isRebootRequiredOutput(string(output)) {
+		pm.logger.Warnf("Power mode %d requires a reboot to take effect. Run 'sudo nvpmodel -m %d' on the device (confirm the reboot prompt), or reboot after running it, to apply it.", pm.config.PowerMode, pm.config.PowerMode)
+		return true, nil
+	}
 	if err != nil {
-		// nvpmodel exits non-zero when the requested mode needs a reboot and our
-		// "no" answer aborted it. Treat that as a non-fatal "reboot required"
-		// result rather than failing the component build.
-		if isRebootRequiredOutput(string(output)) {
-			pm.logger.Warnf("Power mode %d requires a reboot to take effect. Run 'sudo nvpmodel -m %d' on the device (confirm the reboot prompt), or reboot after running it, to apply it.", pm.config.PowerMode, pm.config.PowerMode)
-			return true, nil
-		}
 		return false, fmt.Errorf("failed to set power mode: %v, output: %s", err, string(output))
 	}
 	// nvpmodel applied the mode immediately; no reboot needed.

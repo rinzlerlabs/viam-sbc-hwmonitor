@@ -9,6 +9,18 @@ import (
 func TestPowerModeOnlyAppliesOnce(t *testing.T) {
 }
 
+func TestIsRebootRequiredOutput(t *testing.T) {
+	// Captured from a real device: `nvpmodel -m 1` declined via the
+	// interactive prompt.
+	output := `NVPM WARN: Golden image context is already created
+NVPM WARN: Reboot required for changing to this power mode: 1
+NVPM WARN: DO YOU WANT TO REBOOT NOW? enter YES/yes to confirm:
+NVPM ERROR: optMask is 1, no request for power mode`
+	require.True(t, isRebootRequiredOutput(output))
+
+	require.False(t, isRebootRequiredOutput("NV Power Mode: MAXN\n0"))
+}
+
 func TestParsePowerModeOutput(t *testing.T) {
 	output := `NV Power Mode: 15W
 0`

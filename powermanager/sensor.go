@@ -83,7 +83,7 @@ func (c *Config) Reconfigure(ctx context.Context, _ resource.Dependencies, conf 
 	return nil
 }
 
-func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
+func (c *Config) Readings(ctx context.Context, extra map[string]any) (map[string]any, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
@@ -103,7 +103,7 @@ func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (ma
 	if err != nil {
 		return nil, err
 	}
-	ret := map[string]interface{}{"MinimumFrequency": minFreq, "MaximumFrequency": maxFreq, "CurrentFrequency": currentFreq, "Governor": governor}
+	ret := map[string]any{"MinimumFrequency": minFreq, "MaximumFrequency": maxFreq, "CurrentFrequency": currentFreq, "Governor": governor}
 	powerMode, err := c.pm.GetCurrentPowerMode()
 	if err != nil {
 		return nil, err

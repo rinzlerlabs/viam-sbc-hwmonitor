@@ -29,7 +29,7 @@ type Config struct {
 	logger       logging.Logger
 	sleepTime    time.Duration
 	workers      *viamutils.StoppableWorkers
-	reading      map[string]interface{}
+	reading      map[string]any
 }
 
 func init() {
@@ -86,7 +86,7 @@ func (c *Config) Reconfigure(ctx context.Context, _ resource.Dependencies, rawCo
 	return nil
 }
 
-func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
+func (c *Config) Readings(ctx context.Context, extra map[string]any) (map[string]any, error) {
 	c.readingsLock.RLock()
 	defer c.readingsLock.RUnlock()
 	return c.reading, nil
@@ -123,7 +123,7 @@ func (c *Config) startUpdating(ctx context.Context) {
 				c.logger.Warnf("Failed to read CPU stats, skipping iteration: %v", err)
 				continue
 			}
-			ret := make(map[string]interface{})
+			ret := make(map[string]any)
 			for core, prev := range lastStats {
 				curr, ok := currStats[core]
 				if !ok {

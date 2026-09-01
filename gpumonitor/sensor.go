@@ -88,12 +88,12 @@ func (c *Config) Reconfigure(ctx context.Context, _ resource.Dependencies, conf 
 	return nil
 }
 
-func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (map[string]interface{}, error) {
+func (c *Config) Readings(ctx context.Context, extra map[string]any) (map[string]any, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	m := make(map[string]interface{})
+	m := make(map[string]any)
 	if c.gpuMonitor == nil {
-		return map[string]interface{}{
+		return map[string]any{
 			"error": ErrUnsupportedBoard.Error(),
 		}, nil
 	}
@@ -102,7 +102,7 @@ func (c *Config) Readings(ctx context.Context, extra map[string]interface{}) (ma
 		return nil, err
 	}
 	for key, typedStats := range sample {
-		stats := make(map[string]interface{}, len(typedStats))
+		stats := make(map[string]any, len(typedStats))
 		for _, stat := range typedStats {
 			if stat.Type == "" {
 				continue
@@ -124,6 +124,6 @@ func (c *Config) Close(ctx context.Context) error {
 	return nil
 }
 
-func (c *Config) Ready(ctx context.Context, extra map[string]interface{}) (bool, error) {
+func (c *Config) Ready(ctx context.Context, extra map[string]any) (bool, error) {
 	return false, nil
 }

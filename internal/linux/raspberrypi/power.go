@@ -29,11 +29,11 @@ func (s *raspberryPiPowerSensor) GetReading() (voltage, current, power float64, 
 	return
 }
 
-func (s *raspberryPiPowerSensor) GetReadingMap() (map[string]interface{}, error) {
+func (s *raspberryPiPowerSensor) GetReadingMap() (map[string]any, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	voltage, err := getRaspberryPiComponentVoltage(s.name)
-	return map[string]interface{}{
+	return map[string]any{
 		"voltage": voltage,
 	}, err
 }

@@ -60,8 +60,8 @@ func (s *jetsonPowerSensor) GetReading() (voltage, current, power float64, err e
 	return voltage, current, voltage * current, nil
 }
 
-func (s *jetsonPowerSensor) GetReadingMap() (map[string]interface{}, error) {
-	ret := make(map[string]interface{})
+func (s *jetsonPowerSensor) GetReadingMap() (map[string]any, error) {
+	ret := make(map[string]any)
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	voltage, current, power, err := s.GetReading()

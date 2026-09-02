@@ -113,3 +113,25 @@ func parsePowerModeOutput(output string) (int, error) {
 	}
 	return 0, fmt.Errorf("could not find power mode in nvpmodel output: %q", output)
 }
+
+// String reports the power mode and CPU policy this manager applies. The sensor
+// logs the PowerManager itself, and the default format would print this
+// struct's two pointer fields as addresses. power_mode is always shown because
+// 0 is a valid nvpmodel mode; the cpufreq settings are omitted when unset, to
+// match ApplyPowerMode.
+func (pm *jetsonPowerManager) String() string {
+	settings := []string{fmt.Sprintf("power_mode=%d", pm.config.PowerMode)}
+	if pm.config.Governor != "" {
+		settings = append(settings, "governor="+pm.config.Governor)
+	}
+	if pm.config.Frequency != 0 {
+		settings = append(settings, fmt.Sprintf("frequency=%d", pm.config.Frequency))
+	}
+	if pm.config.Minimum != 0 {
+		settings = append(settings, fmt.Sprintf("minimum=%d", pm.config.Minimum))
+	}
+	if pm.config.Maximum != 0 {
+		settings = append(settings, fmt.Sprintf("maximum=%d", pm.config.Maximum))
+	}
+	return "jetson(" + strings.Join(settings, ", ") + ")"
+}

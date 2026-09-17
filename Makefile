@@ -3,17 +3,23 @@ BIN_PATH := bin
 BIN_NAME := rinzlerlabs-sbc-hwmonitor
 ENTRY_POINT := module.go
 VERSION_PATH := utils/version.go
-# Target platform. These drive both the compiler and the `viam module upload`
-# --platform flag, so they must stay in agreement.
+# Target platform. GOOS/GOARCH drive both the compiler and the
+# `viam module upload --platform` flag, so the binary and the registry slot it
+# is labeled with cannot disagree.
 #
-# Viam cloud build sets VIAM_TARGET_OS, and VIAM_BUILD_OS / VIAM_BUILD_ARCH,
-# per target platform. Honor those first so a cloud build produces the artifact
-# it was actually asked for, and fall back to linux/arm64 for local builds.
-# Either can still be overridden on the command line to cross-build the other
-# architecture declared in meta.json, ex: make build GOARCH=amd64
+# Resolved highest precedence first:
+#   1. the command line -- make build GOARCH=arm64 -- to cross-build
+#   2. VIAM_BUILD_OS / VIAM_BUILD_ARCH, set per target by Viam cloud build
+#      (VIAM_TARGET_OS is accepted as an alias for the OS)
+#   3. the host platform, reported by go env
+#
+# The host is the correct default: cloud build compiles each arch listed in
+# meta.json on a native machine of that arch. Never hardcode one instead.
+# Pinning arm64 here shipped an arm64 binary into the linux/amd64 slot. It
+# cannot exec on amd64, and nothing fails until a machine tries to start it.
 VIAM_BUILD_OS ?= $(VIAM_TARGET_OS)
-GOOS ?= $(or $(VIAM_BUILD_OS),linux)
-GOARCH ?= $(or $(VIAM_BUILD_ARCH),arm64)
+GOOS ?= $(or $(VIAM_BUILD_OS),$(shell go env GOOS))
+GOARCH ?= $(or $(VIAM_BUILD_ARCH),$(shell go env GOARCH))
 PLATFORM := $(GOOS)/$(GOARCH)
 PLATFORM_MONIKER := $(GOOS)-$(GOARCH)
 

@@ -51,6 +51,10 @@
     {
       "api":"rdk:component:sensor",
       "model": "rinzlerlabs:hwmonitor:wifi_monitor"
+    },
+    {
+      "api":"rdk:component:sensor",
+      "model": "rinzlerlabs:hwmonitor:power_manager"
     }
   ],
   "build": {

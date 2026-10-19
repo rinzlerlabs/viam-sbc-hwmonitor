@@ -60,7 +60,7 @@
   "build": {
     "build": "make package",
     "path": "package/rinzlerlabs-sbc-hwmonitor.tar.gz",
-    "arch": ["linux/arm64", "linux/amd64"]
+    "arch": ["linux/arm64", "linux/amd64","linux/riscv64"]
   },
   "entrypoint": "bin/rinzlerlabs-sbc-hwmonitor",
   "first_run": ""

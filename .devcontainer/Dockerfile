@@ -1,5 +1,5 @@
-# syntax=docker/dockerfile:1.6
-FROM golang:1.26-bookworm
+# syntax=docker/dockerfile:1.7
+FROM golang:1.26.10-bookworm
 
 # ---- Base dev utilities ----
 RUN apt-get update && \
@@ -34,8 +34,11 @@ WORKDIR /workspaces
 USER ${USERNAME}
 
 # ---- Install common Go tools ----
-RUN go install golang.org/x/tools/gopls@latest \
+RUN go install golang.org/x/tools/gopls@v0.23.0 \
  && go install honnef.co/go/tools/cmd/staticcheck@latest \
- && go install golang.org/x/tools/cmd/goimports@latest
+ && go install golang.org/x/tools/cmd/goimports@latest \
+ && go install golang.org/x/vuln/cmd/govulncheck@latest
+
+ENV PATH="/home/vscode/go/bin:${PATH}"
 
 CMD ["/bin/bash"]
